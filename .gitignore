@@ -1,0 +1,79 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# --- Virtual envs ---
+.venv/
+venv/
+env/
+ENV/
+
+# --- Testing / coverage ---
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+.tox/
+.nox/
+.cache
+nosetests.xml
+
+# --- Type checkers ---
+.mypy_cache/
+.pyre/
+.pytype/
+.ruff_cache/
+
+# --- Node / UI ---
+node_modules/
+ui/dist/
+ui/build/
+*.tsbuildinfo
+.npm/
+.pnpm-store/
+
+# --- IDE ---
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Platform / tooling side-effects (do NOT commit) ---
+.jbeval/
+.codefuse/
+.playwright-mcp/
+
+# --- Local runtime data produced by agent_inspect itself ---
+*.sqlite
+*.sqlite3
+*.db
+agent_inspect_data/
+
+# NOTE: openspec/, docs/, README.md, CLAUDE.md, CONTRIBUTING.md, LICENSE,
+# docs/architecture.md etc. are intentionally NOT ignored — they are the product.

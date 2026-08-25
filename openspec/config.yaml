@@ -1,0 +1,54 @@
+schema: spec-driven
+
+context: |
+  # Agent-Inspect — Agent 交互式调试器(开源/教学项目)
+
+  ## 项目定位(勿漂移)
+  - 定位:**Agent 的交互式 step-debugger**,对标传统软件的 Chrome DevTools + pdb;**不是**又一个 LLM/Agent observability 平台。
+  - 生态现状(事实):LangFuse(MIT,可私有化)、Phoenix(Arize 开源)、OpenInference-Otel 已占据 **observability(只读、事后看)**。
+  - 真正空缺:**活体调试 —— 能暂停、步进、改、重建分支**,回答"为什么这样干、我改哪才有效"。
+  - 完整背景与权衡见仓库根 `agent-inspect-proposal-v2.md`(本 context 即其 spec 化基线;勿与 v1 旧表混淆)。
+
+  ## 核心抽象 —— 决策点(Decision Point)
+  - Agent 执行 = 一串决策点。每个决策点 = {agent_id, step_index, kind(llm|tool), input_context, output}。
+    - input_context:该次决策的完整输入(发给 LLM 的全部 messages / 传给工具的参数)。
+    - output:该次决策的输出(LLM response / 工具返回值)。
+  - 调试器对决策点支持三种姿态(MVP 仅 A/B,C 推迟):
+    - **Mode A · Replay**:只读回放,全部决策点用 recorded output(确定性、零 API 调用、零副作用)。
+    - **Mode B · Fork(旗舰)**:前缀用 recorded output 确定性回放 → 在决策点 N 注入修改 → N+1 起交框架真实执行并继续记录。
+    - **Mode C · Live(推迟,不进 MVP)**:attach 运行中进程 + 条件断点 + step/continue。
+  - 关键:三种姿态**共享同一套决策点抽象与拦截器**,实现上是一个模型的三种行为,非三套功能。
+  - Fork 恰是「记录的只读前缀 + 活的读写后缀」,统一了 v1 里「时间旅行(只读) vs 运行时改(读写)」的矛盾。
+
+  ## 技术栈与工程约束(MVP,MUST)
+  - SDK:**仅 Python**;首版插桩 LangChain + OpenAI SDK 两家;其余框架/语言全部推迟。
+  - 运行时:本机进程内服务器(FastAPI + uvicorn 内嵌),WebSocket(调试双向) + SSE(事件流);**不部署独立 server**。
+  - 存储:**仅本地 SQLite**(单文件);不引入 ClickHouse 或外置后端(推迟)。
+  - UI:**单页** React + Vite + D3 + Canvas;**不上 WASM**,不追 >10万节点(过早优化)。
+  - 启用方式:一行 `agent_inspect.start()` 自动开浏览器到本地面板;零配置、零后端、零 DB 部署。
+  - 语义:站在 **OpenInference 语义约定**上扩 Agent 因果边(`agent.step.cause`),不自造 OTel Agent 语义。
+
+  ## 已确立的架构约定(SME,勿臆测、勿漂移)
+  - **Interceptor 是地基**:把 LLM 调用与工具调用统一包成「先登记决策点 → 按模式决定真调与否」的路由点;三种模式只是其三种行为。
+  - **配置入口收口于启用**:`agent_inspect.start()` 一次调用统一接受记录粒度(dev/prod)与插桩模块开关,不另起配置流程。
+  - **Trace 有可观测生命周期**:每条 trace 维持 进行中/完成/异常中止 三态,归 local-runtime 所有;面板与回放查询据此筛选。空 trace 即尚无决策点的 trace,既可被查询也可被 fork(根 fork 前缀为空)。
+  - **Fork 起点覆盖全边界**:fork 可指向根决策点(前缀为空)、可嵌套(fork 一个 fork 分支产物,前缀沿用该分支记录回放);空 trace 不应产生无起点分支(拒绝并给可观测原因)。fork 起点之前的决策点一律用 recorded output 确定回放,起点之后真执行。
+  - **落盘与并发安全**:**已完成登记即落盘**(崩溃/中止不丢已完成者,因崩溃调试恰需看最后一步);多分支并发真执行的写入**串行落盘**,互不损坏。本地存储单写者天然串行,不为并发写锁背复杂度。
+
+  - Agent 决策结构是**森林 + 跨边(DAG)**而非父子树:分支/并行/重试/多 Agent 通信;决策点间存显式**因果关系边**,不止 parent-child。
+  - 链路传播用 Python **contextvars**(trace_id/branch_id/mode/replay_cursor)贯穿 async;不引入全局可变单例。
+  - 记录粒度**两档**:Dev 全量快照(调试要完整上下文);Prod 仅摘要 + 大对象 hash 去重,一条 config 决定。
+  - 上下文**增量快照**:input_context 只存与父决策点的 diff,共享前缀只存一次;大工具输出存 hash + 实体去重存一份。
+  - Fork 会**真调 LLM/工具**(花钱、有副作用):UI 明示"将真实执行 N+1 起",并提供 `dry_run` 只读预览档;默认 fork 真执行,可一键切只读预览。
+  - 不追求「重放出一模一样的对话」:Replay 用记录值(确定);Fork **故意**重新调 LLM 看改后差异,不追求确定。
+
+  ## 验收文化(写入每个 spec 的 Scenario)
+  - 每个 Requirement **MUST** 至少一个 Scenario,用 **WHEN/THEN** 描述可观测行为;**SHALL** 表规范。
+  - 内部类名/库选型/实现步骤**不进 spec**(归 design.md);行为不可观察就不入 spec。
+  - **spec 文件内禁止出现实现细节**(SQLite / FastAPI / WebSocket / contextvars / monkeypatch / D3 等品牌名只允许出现在本 context 与 design.md),spec 只写可观测行为。
+  - 新建能力 delta spec 头固定 `## ADDED Requirements`;顺序:`## Purpose`(≥50 字符) → `## ADDED Requirements` → `### Requirement:` → `#### Scenario:`(恰好 4 个井号)。
+
+  ## 现状口径(baseline)
+  - 项目 **greenfield**,无现有主规格;本 context 与 change `add-agent-inspect-mvp` 提出的 delta specs 构成**初始基线提案**,归档后并入 `openspec/specs/`。
+  - MVP 能力 5 项:interception / recording / fork / local-runtime / trace-ui。
+  - 显式推迟(非 MVP,后续 change):Live 活体模式(Mode C)、TS/Go SDK、VSCode/JetBrains 插件、内置 eval 引擎、ClickHouse、WASM 大规模渲染、多 Agent 跨进程追踪。
