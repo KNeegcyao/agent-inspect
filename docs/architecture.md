@@ -93,6 +93,10 @@ contextvars 上下文(进程内,贯穿 async):
 
 ## 5. 关键决策锚点(勿漂移)
 
+> 每条锚点的完整 "Why"(竞品定位 / 三态统一 / 反事实 fork / 增量快照 / DAG 因果的来龙去脉)
+> 见 [proposal v2](../agent-inspect-proposal-v2.md) 的"差异化""三态统一""旗舰功能""关键技术难点"各节;
+> 内部实现(类名/库/接线)见 `openspec/changes/archive/2026-08-27-add-agent-inspect-mvp/design.md`。
+
 - **站 OpenInference**,扩 `agent.step.cause` 因果边;不自造 OTel Agent 语义(互通优先)。
 - **决策结构是 DAG/森林**,非父子树;`cause_edge` 是 DAG 的实体。
 - **应急预案都写进 design.md**(类名/库/接线),**不进 spec**。

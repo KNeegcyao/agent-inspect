@@ -14,7 +14,7 @@
 
 ## 显式不纳入 MVP(后续 change 处理)
 
-Live 活体调试(Mode C)、TS/Go SDK、VSCode/JetBrains 插件、内置 eval 引擎、ClickHouse 后端、WASM 大规模渲染、多 Agent 跨进程追踪。详见 `openspec/config.yaml#context` 与 `changes/add-agent-inspect-mvp/proposal.md`。
+Live 活体调试(Mode C)、TS/Go SDK、VSCode/JetBrains 插件、内置 eval 引擎、ClickHouse 后端、WASM 大规模渲染、多 Agent 跨进程追踪。详见 `openspec/config.yaml#context` 与 `openspec/changes/archive/2026-08-27-add-agent-inspect-mvp/proposal.md`。
 
 ## 验收判据(Criteria)在哪
 

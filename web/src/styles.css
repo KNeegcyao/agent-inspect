@@ -1,0 +1,480 @@
+:root {
+  --bg: #0f1420;
+  --panel: #121a2c;
+  --panel-2: #172238;
+  --border: #24324d;
+  --text: #dbe4ff;
+  --muted: #8b9bb8;
+  --accent: #3b82f6;
+  --accent-2: #7dd3fc;
+  --fork: #f59e0b;
+  --danger: #f87171;
+  --ok: #34d399;
+  --mono: ui-monospace, 'Cascadia Code', Consolas, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 13px;
+}
+
+.app {
+  display: grid;
+  grid-template-columns: 260px 1fr 420px;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ---- 左侧:trace 列表 ---- */
+.sidebar {
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  gap: 10px;
+  overflow-y: auto;
+}
+
+.app-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.app-title h1 {
+  font-size: 15px;
+  margin: 0;
+  color: var(--accent-2);
+}
+
+.conn {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+.conn-open {
+  color: var(--ok);
+  border-color: var(--ok);
+}
+.conn-error {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+
+.filters {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.chip {
+  background: var(--panel-2);
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 3px 10px;
+  font-family: var(--mono);
+  font-size: 12px;
+  cursor: pointer;
+}
+.chip-active {
+  color: #fff;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.trace-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.trace-item {
+  text-align: left;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  cursor: pointer;
+  color: var(--text);
+  font-family: var(--mono);
+}
+.trace-item:hover {
+  border-color: var(--accent);
+}
+.trace-active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.trace-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.trace-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.trace-sub {
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: 11px;
+  margin-top: 4px;
+}
+
+.life {
+  font-size: 11px;
+  padding: 1px 8px;
+  border-radius: 10px;
+}
+.life-running {
+  color: var(--accent-2);
+  border: 1px solid var(--accent);
+}
+.life-done {
+  color: var(--ok);
+  border: 1px solid var(--ok);
+}
+.life-aborted {
+  color: var(--danger);
+  border: 1px solid var(--danger);
+}
+
+.ghost-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-family: var(--mono);
+  cursor: pointer;
+}
+.ghost-btn:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+.ghost-btn.small {
+  padding: 2px 8px;
+  font-size: 12px;
+}
+
+/* ---- 中间:链路画布 ---- */
+.main {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.toolbar {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  flex-wrap: wrap;
+}
+
+.branch-pick {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.branch-pick label {
+  color: var(--muted);
+  font-size: 12px;
+}
+.branch-pick select {
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-family: var(--mono);
+  max-width: 240px;
+}
+
+.toolbar-note {
+  color: var(--fork);
+  font-size: 12px;
+}
+
+.origin-badge {
+  font-size: 11px;
+  padding: 1px 8px;
+  border-radius: 10px;
+}
+.origin-badge.record {
+  color: var(--accent-2);
+  border: 1px solid var(--accent);
+}
+.origin-badge.fork {
+  color: var(--fork);
+  border: 1px solid var(--fork);
+}
+
+.canvas-area {
+  flex: 1;
+  overflow: auto;
+  padding: 14px;
+  position: relative;
+}
+.canvas-area.side-by-side {
+  display: flex;
+  gap: 16px;
+}
+.canvas-col {
+  flex: 1;
+  min-width: 0;
+}
+.col-label {
+  color: var(--muted);
+  font-size: 12px;
+  margin-bottom: 6px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.divergence-count {
+  color: var(--danger);
+}
+
+.chain-canvas {
+  position: relative;
+}
+.chain-canvas canvas {
+  display: block;
+  cursor: pointer;
+}
+
+.tooltip {
+  position: absolute;
+  z-index: 10;
+  width: 300px;
+  background: #0b1020f2;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 10px;
+  pointer-events: none;
+  font-size: 12px;
+}
+.tooltip b {
+  color: var(--accent-2);
+}
+.tooltip span {
+  display: block;
+  color: var(--muted);
+  margin: 2px 0;
+}
+.tooltip pre {
+  margin: 0;
+  max-height: 140px;
+  overflow: auto;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-size: 11px;
+}
+
+/* ---- 右侧:检查与 Fork ---- */
+.inspector {
+  background: var(--panel);
+  border-left: 1px solid var(--border);
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.inspector-hint {
+  color: var(--muted);
+  padding: 10px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+}
+
+.panel {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.panel-head h3 {
+  margin: 0;
+  font-size: 13px;
+  color: var(--accent-2);
+}
+
+.kv-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  padding: 2px 0;
+  border-bottom: 1px dashed var(--border);
+}
+.kv-row span {
+  color: var(--muted);
+}
+.kv-row code {
+  color: var(--text);
+  max-width: 60%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.json-block {
+  margin-top: 10px;
+}
+.json-label {
+  color: var(--muted);
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+.json-block pre {
+  margin: 0;
+  background: #0b1020;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px;
+  max-height: 220px;
+  overflow: auto;
+  font-size: 11px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.err-block {
+  margin-top: 10px;
+  background: #2a1420;
+  border: 1px solid var(--danger);
+  border-radius: 8px;
+  padding: 8px;
+  color: var(--danger);
+  font-size: 12px;
+}
+.err-block pre {
+  margin: 4px 0 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-size: 11px;
+}
+
+/* ---- Fork 面板 ---- */
+.fork-btn {
+  background: var(--fork);
+  color: #1a1202;
+  border: none;
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-family: var(--mono);
+  font-weight: 600;
+  cursor: pointer;
+}
+.fork-btn:hover {
+  filter: brightness(1.1);
+}
+.fork-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.fork-btn.wide {
+  width: 100%;
+  padding: 9px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.field > span {
+  color: var(--muted);
+  font-size: 12px;
+}
+.field input,
+.field textarea,
+.field select {
+  background: #0b1020;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-family: var(--mono);
+  font-size: 12px;
+  width: 100%;
+}
+.field textarea {
+  resize: vertical;
+  min-height: 40px;
+}
+
+.mod-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.mod-row .mod-step {
+  width: 64px;
+}
+.mod-row .mod-field {
+  flex: 1;
+  min-width: 140px;
+}
+.mod-row textarea {
+  flex-basis: 100%;
+}
+
+.empty-hint {
+  color: var(--muted);
+  font-size: 12px;
+  padding: 4px 0;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--muted);
+  text-align: center;
+  gap: 4px;
+}
+.empty-state h2 {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 500;
+}

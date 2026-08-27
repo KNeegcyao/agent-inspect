@@ -54,6 +54,14 @@ That's it. No server to deploy. No database to configure. Interception is **zero
 
 **What you'll see:** a single-page panel rendering this run's decision chain — *think → tool → result* — as a tree. Click any decision point to read its full prompt. Hit **Fork**, change a prompt or a tool result, and the Agent re-executes the steps *after* your change while replaying the prefix for free (no real LLM calls on the prefix). Watch the two branches diverge, side by side.
 
+**Run it offline right now** (no API key needed — ships with a scripted chat model):
+
+```bash
+python examples/react_agent_demo.py
+```
+
+This records a real LangChain ReAct agent run, forks step 0 with a modified prompt, re-executes the fork, and leaves the two branches side-by-side in the panel for you to compare.
+
 > The exact `pyproject.toml` packaging is being finalized (likely `pip install agent-inspect` once published; for now `pip install -e .` from the repo). See [Open Questions](docs/product.md#10-open-questions).
 
 ---
@@ -102,10 +110,10 @@ This repo is **spec-driven** — "align the spec, then write code" is mandatory,
 ```bash
 python -m pip install -e ".[dev]" && pytest -q   # green
 openspec validate --all                            # 1 passed
-cd ui && npm install && npm run build              # green (UI)
+cd web && npm install && npm run build             # green (UI)
 ```
 
-The current implementation change is `add-agent-inspect-mvp`; its tasks live at [`openspec/changes/add-agent-inspect-mvp/tasks.md`](openspec/changes/add-agent-inspect-mvp/tasks.md).
+The MVP implementation change `add-agent-inspect-mvp` is **applied and archived**; its proposal → specs → design → tasks live at [`openspec/changes/archive/2026-08-27-add-agent-inspect-mvp/`](openspec/changes/archive/2026-08-27-add-agent-inspect-mvp/).
 
 ---
 
@@ -113,7 +121,7 @@ The current implementation change is `add-agent-inspect-mvp`; its tasks live at 
 
 - **[docs/product.md](docs/product.md)** — the product positioning doc (pain, positioning, the three-mode model, roadmap, competitor contrast).
 - **[agent-inspect-proposal-v2.md](agent-inspect-proposal-v2.md)** — the full technical proposal (market framing, architecture, the critical decisions, risks).
-- **[openspec/](openspec/)** — the spec-driven source of truth (`openspec/specs/README.md` is the capability baseline; `openspec/changes/add-agent-inspect-mvp/` is the current implementation change: proposal → specs → design → tasks).
+- **[openspec/](openspec/)** — the spec-driven source of truth (`openspec/specs/README.md` is the capability baseline; the merged MVP specs are the `fork/interception/recording/local-runtime/trace-ui` capabilities; the archived change `openspec/changes/archive/2026-08-27-add-agent-inspect-mvp/` holds proposal → design → tasks).
 
 Spec is source of truth; prose docs explain *why* the spec says what it says.
 
@@ -121,7 +129,7 @@ Spec is source of truth; prose docs explain *why* the spec says what it says.
 
 ## Status
 
-Pre-alpha / spec-complete. The specification (`openspec/`) is written, peer-reviewed, and validated (69 scenarios across 30 requirements). Code scaffolding is the current phase. See [tasks](openspec/changes/add-agent-inspect-mvp/tasks.md).
+Pre-alpha / **MVP implemented, tested and archived**. The MVP (`add-agent-inspect-mvp`): one-line `agent_inspect.start()`, LangChain + OpenAI auto-instrumentation, Replay + Counterfactual Fork, local SQLite storage, single-page React panel. **38 tests green** (unit + integration + e2e), `openspec validate --all` passes, specs merged into baseline. UI rendering is verified in-browser. See [tasks](openspec/changes/archive/2026-08-27-add-agent-inspect-mvp/tasks.md).
 
 ## License
 

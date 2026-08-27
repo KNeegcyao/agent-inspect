@@ -43,5 +43,5 @@ v2 方案(见仓库根 `agent-inspect-proposal-v2.md`)据此收敛:MVP 只做 **
 ## Open Questions
 
 - Q1(已收敛):Fork 后缀"真实执行"调用的是**实际环境**的工具(可能改外部状态);"fork 副作用沙箱快照"不在本 change 范围,**推进至 Phase 2 另立独立 change**(已同步写入 Out of Scope)。MVP 内仅以"真执行明示 + dry_run 只读预览"处理副作用可见性。
-- Q2(待人工拍):本地零配置是否需支持 `pip install agent-inspect` 单条命令直装即用?**推荐答案**:采用单独可 pip 安装的 Python 包形态(MVP 先以源码 + `pip install -e .` 起,P0 打包 PyPI 留到发版前)。最终于 apply 阶段确认。
+- Q2(已拍板):本地零配置需支持 `pip install agent-inspect` 单条命令直装即用。**决定**:采用标准可 pip 安装的 Python 包形态——仓库根 `pyproject.toml`(setuptools,`name=agent-inspect`,`include=["agent_inspect*"]`)已可 `pip install -e .` 直装;PyPI 发布(P0)留到正式发版前(届时 `python -m build` + `twine upload` 即可,无需改包结构)。
 - Q3(已收敛):无头/CI 环境降级——spec 已由 `local-runtime 无头环境降级` scenario 覆盖("不报错,改为输出可访问地址")。**默认策略定为**:自动开浏览器仅在能检测到可用本机浏览器时触发,否则仅打印本地 URL;无额外配置项。
