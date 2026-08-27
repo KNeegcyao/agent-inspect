@@ -4,7 +4,7 @@
 
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Status: pre-alpha](https://img.shields.io/badge/status-pre--alpha-orange.svg)](#status)
-[![Spec: 86 scenarios / 37 req](https://img.shields.io/badge/spec-86%20scenarios%20%2F%2037%20req-green.svg)](openspec/)
+[![Spec: 97 scenarios / 41 req](https://img.shields.io/badge/spec-97%20scenarios%20%2F%2041%20req-green.svg)](openspec/)
 
 **Agent-Inspect** is an interactive step-debugger for LLM Agents — not another tracing platform. It brings the Chrome DevTools / `pdb` experience to Agent development: drop in one line, and a local debug panel opens in your browser. You can inspect the full prompt at any decision point, change a prompt or a tool's return value, and fork a new branch to see what the Agent does *after the change* — without rerunning the whole thing.
 
@@ -96,6 +96,23 @@ Live debugging shares the same interceptor as Record/Replay/Fork — no second e
 
 ---
 
+## Branch diff: compare two branches, field by field
+
+Once you have two branches (a recorded run + a fork, or two forks), select a **对比分支** in the panel and the two decision chains render side by side, aligned by step:
+
+1. Pick a **主分支** and a **对比分支** in the toolbar.
+2. Each aligned step gets a status: **same** (shared prefix or identical), **diff** (diverged), **only-left / only-right** (exists on one side only) — color-coded on the chain.
+3. Click a divergent step: the inspector shows the **field-level diff** — every changed input/output field with its left-vs-right value; fields present on only one side are marked **增/删** rather than silently ignored.
+4. A summary chip above the compare column totals the four statuses.
+
+```bash
+python examples/react_agent_demo.py   # records a run + a fork → pick both branches → read the diff
+```
+
+The diff is a **read-only** computation over the stored branches — no re-execution, no writes, no schema change.
+
+---
+
 ## Core ideas
 
 1. **A decision is a unit.** Every LLM call and every tool call is recorded as a *decision point* — full prompt in, full response out, with latency and tokens.
@@ -112,7 +129,7 @@ Live debugging shares the same interceptor as Record/Replay/Fork — no second e
 - Replay (read-only) + **Counterfactual Fork** (the flagship).
 - **Live (Mode C)**: attach to a running agent, conditional breakpoints, pause / step / continue, edit an input at a paused point.
 - One-line launch with a local panel; local file storage; zero external backend.
-- Single-page React UI: decision tree, full-prompt inspection, fork interaction, branch compare, live debug toolbar.
+- Single-page React UI: decision tree, full-prompt inspection, fork interaction, branch diff (side-by-side, field-level), live debug toolbar.
 
 **Deliberately out (follow-up changes):**
 - Fork side-effect sandbox. Phase 2 (for now: real execution is explicit, + a `dry_run` preview).
@@ -143,7 +160,7 @@ openspec validate --all                            # all specs pass
 cd web && npm install && npm run build             # green (UI)
 ```
 
-The MVP implementation change `add-agent-inspect-mvp` and the Live debugging (Mode C) change `add-live-debug-mode-c` are **applied and archived**; their proposals → specs → design → tasks live at [`openspec/changes/archive/2026-08-27-add-agent-inspect-mvp/`](openspec/changes/archive/2026-08-27-add-agent-inspect-mvp/) and [`openspec/changes/archive/2026-08-27-add-live-debug-mode-c/`](openspec/changes/archive/2026-08-27-add-live-debug-mode-c/).
+The MVP implementation change `add-agent-inspect-mvp`, the Live debugging (Mode C) change `add-live-debug-mode-c`, and the Branch diff change `add-branch-diff` are **applied and archived**; their proposals → specs → design → tasks live at [`openspec/changes/archive/2026-08-27-add-agent-inspect-mvp/`](openspec/changes/archive/2026-08-27-add-agent-inspect-mvp/), [`openspec/changes/archive/2026-08-27-add-live-debug-mode-c/`](openspec/changes/archive/2026-08-27-add-live-debug-mode-c/), and [`openspec/changes/archive/2026-08-27-add-branch-diff/`](openspec/changes/archive/2026-08-27-add-branch-diff/).
 
 ---
 
@@ -151,7 +168,7 @@ The MVP implementation change `add-agent-inspect-mvp` and the Live debugging (Mo
 
 - **[docs/product.md](docs/product.md)** — the product positioning doc (pain, positioning, the three-mode model, roadmap, competitor contrast).
 - **[agent-inspect-proposal-v2.md](agent-inspect-proposal-v2.md)** — the full technical proposal (market framing, architecture, the critical decisions, risks).
-- **[openspec/](openspec/)** — the spec-driven source of truth (`openspec/specs/README.md` is the capability baseline; the merged specs are the `fork/interception/recording/local-runtime/trace-ui/live-debug` capabilities; the archived changes `openspec/changes/archive/2026-08-27-add-agent-inspect-mvp/` and `openspec/changes/archive/2026-08-27-add-live-debug-mode-c/` hold proposal → design → tasks).
+- **[openspec/](openspec/)** — the spec-driven source of truth (`openspec/specs/README.md` is the capability baseline; the merged specs are the `fork/interception/recording/local-runtime/trace-ui/live-debug/branch-diff` capabilities; the archived changes `openspec/changes/archive/2026-08-27-add-agent-inspect-mvp/`, `openspec/changes/archive/2026-08-27-add-live-debug-mode-c/`, and `openspec/changes/archive/2026-08-27-add-branch-diff/` hold proposal → design → tasks).
 
 Spec is source of truth; prose docs explain *why* the spec says what it says.
 
@@ -159,7 +176,7 @@ Spec is source of truth; prose docs explain *why* the spec says what it says.
 
 ## Status
 
-Pre-alpha / **MVP implemented, tested and archived**. The MVP (`add-agent-inspect-mvp`): one-line `agent_inspect.start()`, LangChain + OpenAI auto-instrumentation, Replay + Counterfactual Fork, local SQLite storage, single-page React panel. **Live debugging (Mode C)** (`add-live-debug-mode-c`): attach to a running agent, conditional breakpoints, pause / step / continue, edit input at a paused point. **52 tests green** (unit + integration + e2e), `openspec validate --all` passes, specs merged into baseline. UI rendering is verified in-browser. See [tasks](openspec/changes/archive/2026-08-27-add-live-debug-mode-c/tasks.md).
+Pre-alpha / **MVP implemented, tested and archived**. The MVP (`add-agent-inspect-mvp`): one-line `agent_inspect.start()`, LangChain + OpenAI auto-instrumentation, Replay + Counterfactual Fork, local SQLite storage, single-page React panel. **Live debugging (Mode C)** (`add-live-debug-mode-c`): attach to a running agent, conditional breakpoints, pause / step / continue, edit input at a paused point. **Branch diff** (`add-branch-diff`): side-by-side compare of two branches with per-step status and field-level diff detail. **65 tests green** (unit + integration + e2e), `openspec validate --all` passes, specs merged into baseline. UI rendering is verified in-browser. See [tasks](openspec/changes/archive/2026-08-27-add-branch-diff/tasks.md).
 
 ## License
 

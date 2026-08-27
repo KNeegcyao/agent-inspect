@@ -17,6 +17,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Streamin
 from fastapi.staticfiles import StaticFiles
 
 from .. import _models as m
+from ..diff import diff_branches
 from ..fork import Modification
 
 
@@ -119,6 +120,23 @@ def create_app(session) -> FastAPI:
     @app.get("/api/branches/{branch_id}/points")
     def branch_points_route(branch_id: str):
         return _branch_points(branch_id)
+
+    @app.get("/api/branches/{branch_a}/diff/{branch_b}")
+    def branch_diff_route(branch_a: str, branch_b: str):
+        """两分支完整链路 diff:对齐步骤(same/diff/only_left/only_right)+ 字段级明细 + 汇总。"""
+        ba = session.store.get_branch(branch_a)
+        bb = session.store.get_branch(branch_b)
+        if ba is None or bb is None:
+            return JSONResponse({"error": "branch not found"}, status_code=404)
+        if ba.trace_id != bb.trace_id:
+            return JSONResponse({"error": "branches belong to different traces"}, status_code=422)
+        return diff_branches(
+            session.store,
+            session.recorder.serializer,
+            session.recorder.context_snap,
+            branch_a,
+            branch_b,
+        )
 
     # ---- fork ----
     @app.post("/api/forks")

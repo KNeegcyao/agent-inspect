@@ -47,6 +47,7 @@ export default function App() {
   const [debugState, setDebugState] = useState(null) // {attached, paused_at, waiting, breakpoints}
   const [pausedPayload, setPausedPayload] = useState(null) // trace.paused 载荷(完整输入)
   const [forkFromStep, setForkFromStep] = useState(null) // "在此 Fork" 定位的起点步骤
+  const [diffData, setDiffData] = useState(null) // {steps, summary} | null:分支 diff 结果
 
   // 供稳定 SSE 回调读取的 ref(避免因依赖变化反复重连)
   const ownPointsRef = useRef(ownPoints)
@@ -77,6 +78,7 @@ export default function App() {
       setCompareBranchId(null)
       setDebugState(null)
       setPausedPayload(null)
+      setDiffData(null)
       api.debugState(id).then(setDebugState).catch(() => {})
       const root = data.trace.root_branch_id
       const hasRoot = root && data.branches.some((b) => b.id === root)
@@ -147,24 +149,35 @@ export default function App() {
   // ---- 对比分支完整链路 ----
   const compareChain = useChain(compareBranchId, branchesById, getPoints, ownPoints)
 
-  // 分歧步骤:两个链同 step_index 输出不同(或仅一侧有)
-  const divergentSteps = useMemo(() => {
-    const d = new Set()
-    if (!compareChain.length) return d
-    const byStep = (chain) => {
-      const m = new Map()
-      for (const p of chain) m.set(p.step_index, p)
-      return m
+  // ---- 分支 diff:active+compare 均选中时请求后端,作为并排着色/明细的单一事实源 ----
+  const diffByStep = useMemo(() => {
+    const m = {}
+    for (const s of diffData?.steps || []) m[s.step_index] = s
+    return m
+  }, [diffData])
+  const diffStatus = useMemo(() => {
+    const m = {}
+    for (const [k, v] of Object.entries(diffByStep)) m[k] = v.status
+    return m
+  }, [diffByStep])
+  useEffect(() => {
+    if (!activeBranchId || !compareBranchId) {
+      setDiffData(null)
+      return undefined
     }
-    const a = byStep(activeChain)
-    const b = byStep(compareChain)
-    for (const s of new Set([...a.keys(), ...b.keys()])) {
-      const oa = JSON.stringify(a.get(s)?.output ?? null)
-      const ob = JSON.stringify(b.get(s)?.output ?? null)
-      if (oa !== ob) d.add(s)
+    let cancel = false
+    api
+      .branchDiff(activeBranchId, compareBranchId)
+      .then((d) => {
+        if (!cancel) setDiffData(d)
+      })
+      .catch((e) => {
+        if (!cancel) setError(e.message)
+      })
+    return () => {
+      cancel = true
     }
-    return d
-  }, [activeChain, compareChain])
+  }, [activeBranchId, compareBranchId, ownPoints])
 
   const selected = useMemo(() => {
     for (const p of [...activeChain, ...compareChain]) {
@@ -172,6 +185,7 @@ export default function App() {
     }
     return null
   }, [activeChain, compareChain, selectedId])
+  const selectedDiff = selected ? diffByStep[selected.step_index] : null
 
   const activeBranch = activeBranchId ? branchesById[activeBranchId] : null
 
@@ -331,7 +345,7 @@ export default function App() {
                   <ChainCanvas
                     points={activeChain}
                     selectedId={selectedId}
-                    divergentSteps={divergentSteps}
+                    diffStatus={diffStatus}
                     pausedStep={pausedStep}
                     onSelect={(n) => {
                       setSelectedId(n.id)
@@ -344,16 +358,17 @@ export default function App() {
                 <div className="canvas-col">
                   <div className="col-label">
                     对比分支 · {compareBranchId?.slice(-8)}
-                    {divergentSteps.size > 0 && (
+                    {diffData && (
                       <span className="divergence-count">
-                        {divergentSteps.size} 处分歧
+                        同 {diffData.summary.same} · 异 {diffData.summary.diff} · 仅左{' '}
+                        {diffData.summary.only_left} · 仅右 {diffData.summary.only_right}
                       </span>
                     )}
                   </div>
                   <ChainCanvas
                     points={compareChain}
                     selectedId={selectedId}
-                    divergentSteps={divergentSteps}
+                    diffStatus={diffStatus}
                     pausedStep={pausedStep}
                     onSelect={(n) => setSelectedId(n.id)}
                   />
@@ -371,6 +386,14 @@ export default function App() {
             onStep={onDebugStep}
             onContinue={onDebugContinue}
             onModify={onDebugModify}
+          />
+        )}
+        {selectedDiff?.status === 'diff' && selectedDiff.fields?.length > 0 && (
+          <DiffPanel
+            step={selected}
+            diff={selectedDiff}
+            branchA={activeBranchId}
+            branchB={compareBranchId}
           />
         )}
         {selected ? (
@@ -815,6 +838,48 @@ function PausePanel({ payload, onStep, onContinue, onModify }) {
           {busy ? '应用中…' : '应用修改并继续'}
         </button>
       </div>
+    </section>
+  )
+}
+
+// ---- 分支 diff 字段级明细面板(选中差异步骤时展示)----
+const DIFF_TAG = { changed: '改', added: '增', removed: '删' }
+
+function DiffPanel({ step, diff, branchA, branchB }) {
+  return (
+    <section className="panel diff-panel">
+      <div className="panel-head">
+        <h3>字段差异 · 步骤 {step.step_index}</h3>
+        <span className="diff-badge">{kindLabel(step.kind)}</span>
+      </div>
+      <div className="kv-row">
+        <span>对比</span>
+        <span className="diff-heads">
+          <b>左 · {branchA?.slice(-8)}</b>
+          <b>右 · {branchB?.slice(-8)}</b>
+        </span>
+      </div>
+      {diff.fields.map((f, i) => {
+        const showLeft = f.status !== 'added'
+        const showRight = f.status !== 'removed'
+        return (
+          <div key={i} className="diff-row">
+            <div className="diff-path">
+              <span className={`diff-dot ${f.status}`} />
+              <code>{f.path}</code>
+              <span className={`diff-tag ${f.status}`}>{DIFF_TAG[f.status]}</span>
+            </div>
+            <div className="diff-cells">
+              <pre className={showLeft ? '' : 'diff-none'}>
+                {showLeft ? JSON.stringify(f.left, null, 2) : '—'}
+              </pre>
+              <pre className={showRight ? '' : 'diff-none'}>
+                {showRight ? JSON.stringify(f.right, null, 2) : '—'}
+              </pre>
+            </div>
+          </div>
+        )
+      })}
     </section>
   )
 }

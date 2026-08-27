@@ -25,6 +25,11 @@ export const api = {
   getBranchPoints(branchId) {
     return fetch(`/api/branches/${encodeURIComponent(branchId)}/points`).then(parse)
   },
+  branchDiff(branchA, branchB) {
+    return fetch(
+      `/api/branches/${encodeURIComponent(branchA)}/diff/${encodeURIComponent(branchB)}`
+    ).then(parse)
+  },
   createFork(payload) {
     return fetch('/api/forks', {
       method: 'POST',

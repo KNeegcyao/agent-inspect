@@ -258,7 +258,11 @@ body {
   align-items: center;
 }
 .divergence-count {
-  color: var(--danger);
+  color: var(--accent-2);
+  font-size: 11px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1px 8px;
 }
 
 .chain-canvas {
@@ -621,4 +625,96 @@ body {
 .pause-actions .debug-btn {
   flex: 1;
   text-align: center;
+}
+
+/* ---- 分支 diff 明细面板 ---- */
+.diff-panel {
+  border-color: var(--danger);
+}
+.diff-panel .panel-head h3 {
+  color: var(--danger);
+}
+.diff-badge {
+  font-size: 11px;
+  color: var(--accent-2);
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  padding: 1px 8px;
+}
+.diff-heads {
+  display: flex;
+  gap: 12px;
+  color: var(--text);
+}
+.diff-heads b {
+  font-weight: 600;
+}
+.diff-row {
+  margin-top: 8px;
+  background: #0b1020;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px;
+}
+.diff-path {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.diff-path code {
+  color: var(--accent-2);
+  font-size: 11px;
+  word-break: break-all;
+  flex: 1;
+}
+.diff-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+.diff-dot.changed,
+.diff-dot.removed {
+  background: var(--danger);
+}
+.diff-dot.added {
+  background: var(--ok);
+}
+.diff-tag {
+  font-size: 10px;
+  padding: 0 6px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+.diff-tag.changed,
+.diff-tag.removed {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+.diff-tag.added {
+  color: var(--ok);
+  border-color: var(--ok);
+}
+.diff-cells {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.diff-cells pre {
+  margin: 0;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 11px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 160px;
+  overflow: auto;
+  color: var(--text);
+}
+.diff-none {
+  color: var(--muted);
+  font-style: italic;
 }

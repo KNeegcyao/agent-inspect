@@ -68,6 +68,20 @@ def _get(base: str, path: str):
     return _retry_conn(lambda: _get_raw(base, path))
 
 
+def _get_error(base: str, path: str):
+    """GET 且期望非 2xx(404/422 等),返回 (status, json body)。"""
+    req = urllib.request.Request(base + path)
+    try:
+        with urllib.request.urlopen(req, timeout=5) as r:
+            return r.status, json.loads(r.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        try:
+            body = json.loads(e.read().decode("utf-8"))
+        except Exception:  # noqa: BLE001
+            body = {}
+        return e.code, body
+
+
 def _post(base: str, path: str, payload: dict):
     return _retry_conn(lambda: _post_raw(base, path, payload))
 
@@ -323,3 +337,50 @@ def test_live_debug_mode_c_e2e(session):
         "s3",
         "s4",
     ]
+
+
+def test_branch_diff_api_e2e(session):
+    """分支 diff 接口:对齐步骤 + 字段级明细 + 汇总;分支缺失 404 / 跨 trace 422。
+
+    覆盖 spec branch-diff:分支步骤对齐与状态(共享前缀相同 / 分叉差异)、
+    字段级差异明细(输出字段左右取值)、差异汇总(四类计数)、只读接口错误路径。
+    """
+    base = session.url
+    # 记录 root 分支:a,b,c
+    with session.trace() as tid:
+        run_agent(session.interceptor, 3, FakeLLM(["a", "b", "c"]))
+    _st, data = _get(base, f"/api/traces/{tid}")
+    root = data["trace"]["root_branch_id"]
+
+    # 两个 fork 分支:同从 step1 分叉(进入待执行队列,按序消费)
+    _st, f1 = _post(base, "/api/forks", {"trace_id": tid, "branch_id": root, "from_step": 1})
+    assert _st == 200, f1
+    _st, f2 = _post(base, "/api/forks", {"trace_id": tid, "branch_id": root, "from_step": 1})
+    assert _st == 200, f2
+
+    # 依次执行两分支:step0 前缀回放(不真调),step1/2 后缀真调
+    with session.trace():
+        run_agent(session.interceptor, 3, FakeLLM(["X", "Y"]))
+    with session.trace():
+        run_agent(session.interceptor, 3, FakeLLM(["Z", "W"]))
+
+    # ---- diff:共享前缀 same,分叉后缀 diff ----
+    _st, res = _get(base, f"/api/branches/{f1['branch']['id']}/diff/{f2['branch']['id']}")
+    assert res["branch_a"] == f1["branch"]["id"]
+    assert res["branch_b"] == f2["branch"]["id"]
+    assert [s["status"] for s in res["steps"]] == ["same", "diff", "diff"]
+    assert res["summary"] == {"same": 1, "diff": 2, "only_left": 0, "only_right": 0}
+    # 字段明细:step1 输出 X vs Z
+    step1 = next(s for s in res["steps"] if s["step_index"] == 1)
+    field = next(f for f in step1["fields"] if f["path"] == "output.content")
+    assert field["left"] == "X" and field["right"] == "Z" and field["status"] == "changed"
+
+    # ---- 错误路径:分支缺失 404;跨 trace 422 ----
+    st, body = _get_error(base, "/api/branches/does-not-exist/diff/does-not-exist")
+    assert st == 404 and body.get("error")
+    with session.trace() as tid2:
+        run_agent(session.interceptor, 1, FakeLLM(["x"]))
+    _st, data2 = _get(base, f"/api/traces/{tid2}")
+    root2 = data2["trace"]["root_branch_id"]
+    st, body = _get_error(base, f"/api/branches/{root}/diff/{root2}")
+    assert st == 422

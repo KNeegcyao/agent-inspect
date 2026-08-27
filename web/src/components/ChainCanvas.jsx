@@ -95,10 +95,19 @@ function drawEdges(ctx, edges) {
   ctx.restore()
 }
 
-function drawNode(ctx, node, { selected, divergent }) {
+// diff 状态描边色:same 用默认 kind 色,diff=rose,only_left=amber,only_right=blue
+const DIFF_COLORS = {
+  diff: '#fb7185',
+  only_left: '#fbbf24',
+  only_right: '#60a5fa',
+}
+
+function drawNode(ctx, node, { selected, diffStatus }) {
   const r = node.rect
   const color = KIND_COLORS[node.kind] || KIND_COLORS.default
   const hasErr = node.meta && node.meta.error
+  const status = diffStatus ? diffStatus[node.step_index] : null
+  const statusColor = status ? DIFF_COLORS[status] : null
   ctx.save()
   ctx.globalAlpha = node.inherited ? 0.5 : 1
 
@@ -107,7 +116,11 @@ function drawNode(ctx, node, { selected, divergent }) {
   ctx.fill()
 
   ctx.lineWidth = selected ? 2.5 : 1
-  ctx.strokeStyle = hasErr ? '#f87171' : selected ? '#7dd3fc' : divergent ? '#fb7185' : color
+  ctx.strokeStyle = hasErr
+    ? '#f87171'
+    : selected
+      ? '#7dd3fc'
+      : statusColor || color
   ctx.setLineDash(node.inherited ? [4, 4] : [])
   roundRect(ctx, r.x, r.y, r.w, r.h, 8)
   ctx.stroke()
@@ -136,7 +149,7 @@ export default function ChainCanvas({
   points,
   selectedId,
   onSelect,
-  divergentSteps,
+  diffStatus,
   pausedStep,
 }) {
   const canvasRef = useRef(null)
@@ -161,11 +174,11 @@ export default function ChainCanvas({
     for (const node of layout.nodes) {
       drawNode(ctx, node, {
         selected: node.id === selectedId,
-        divergent: divergentSteps ? divergentSteps.has(node.step_index) : false,
+        diffStatus,
         paused: pausedStep != null && node.step_index === pausedStep,
       })
     }
-  }, [layout, selectedId, divergentSteps, pausedStep])
+  }, [layout, selectedId, diffStatus, pausedStep])
 
   const hitTest = (e) => {
     const canvas = canvasRef.current

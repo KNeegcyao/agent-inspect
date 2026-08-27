@@ -1,6 +1,6 @@
 # 能力基线规格 (main specs)
 
-本目录是 Agent-Inspect **当前系统能力的主规格**(单一事实源)。MVP change `add-agent-inspect-mvp` 与 Live 活体调试 change `add-live-debug-mode-c` 均已归档,其 delta 已并入本目录成为正式基线。
+本目录是 Agent-Inspect **当前系统能力的主规格**(单一事实源)。MVP change `add-agent-inspect-mvp`、Live 活体调试 change `add-live-debug-mode-c` 与分支并排 diff change `add-branch-diff` 均已归档,其 delta 已并入本目录成为正式基线。
 
 ## 能力清单 (已并入基线)
 
@@ -12,6 +12,7 @@
 | 本地运行时与面板自启 | `local-runtime/spec.md` | `server/`、`sdk/controller/` | 基线(已归档) |
 | 单条 Trace 决策视图 | `trace-ui/spec.md` | `ui/TraceView/` | 基线(已归档) |
 | Live 活体调试(Mode C) | `live-debug/spec.md` | `interceptor/`、`debug.py` | 基线(change `add-live-debug-mode-c`,已归档) |
+| 分支并排 diff | `branch-diff/spec.md` | `diff.py`、`_server/app.py`、`web/` | 基线(change `add-branch-diff`,已归档) |
 
 ## 显式不纳入 MVP 基线(后续 change 处理)
 
