@@ -1,20 +1,22 @@
 # 能力基线规格 (main specs)
 
-本目录是 Agent-Inspect **当前系统能力的主规格**(单一事实源)。当前为 greenfield:能力基线由进行中的 change `add-agent-inspect-mvp` 提出,待其归档后 delta 并入本目录成为正式基线。
+本目录是 Agent-Inspect **当前系统能力的主规格**(单一事实源)。MVP change `add-agent-inspect-mvp` 已归档,其 delta 已并入本目录成为正式基线。
 
-## 能力清单 (MVP 提案,待归档)
+## 能力清单 (已并入基线)
 
 | 能力 | 路径 | 对应源码层(预期) | 状态 |
 |------|------|-----------|------|
-| 决策点拦截与自动插桩 | `interception/spec.md` | `sdk/interceptor/` | 提案(change `add-agent-inspect-mvp`,待归档) |
-| 决策点记录与存储 | `recording/spec.md` | `sdk/recorder/`、`server/store/` | 提案(待归档) |
-| Counterfactual Fork | `fork/spec.md` | `sdk/interceptor/`、`server/session/` | 提案(待归档) |
-| 本地运行时与面板自启 | `local-runtime/spec.md` | `server/`、`sdk/controller/` | 提案(待归档) |
-| 单条 Trace 决策视图 | `trace-ui/spec.md` | `ui/TraceView/` | 提案(待归档) |
+| 决策点拦截与自动插桩 | `interception/spec.md` | `sdk/interceptor/` | 基线(change `add-agent-inspect-mvp`,已归档) |
+| 决策点记录与存储 | `recording/spec.md` | `sdk/recorder/`、`server/store/` | 基线(已归档) |
+| Counterfactual Fork | `fork/spec.md` | `sdk/interceptor/`、`server/session/` | 基线(已归档) |
+| 本地运行时与面板自启 | `local-runtime/spec.md` | `server/`、`sdk/controller/` | 基线(已归档) |
+| 单条 Trace 决策视图 | `trace-ui/spec.md` | `ui/TraceView/` | 基线(已归档) |
 
-## 显式不纳入 MVP(后续 change 处理)
+> 进行中的 change:`add-live-debug-mode-c`(Mode C 活体调试,delta 见 `openspec/changes/add-live-debug-mode-c/specs/live-debug/spec.md`,未归档前不入本目录)。
 
-Live 活体调试(Mode C)、TS/Go SDK、VSCode/JetBrains 插件、内置 eval 引擎、ClickHouse 后端、WASM 大规模渲染、多 Agent 跨进程追踪。详见 `openspec/config.yaml#context` 与 `openspec/changes/archive/2026-08-27-add-agent-inspect-mvp/proposal.md`。
+## 显式不纳入 MVP 基线(后续 change 处理)
+
+TS/Go SDK、VSCode/JetBrains 插件、内置 eval 引擎、ClickHouse 后端、WASM 大规模渲染、多 Agent 跨进程追踪。Live 活体调试(Mode C)已另立 change `add-live-debug-mode-c`,不再属推迟项。详见 `openspec/config.yaml#context` 与 `openspec/changes/archive/2026-08-27-add-agent-inspect-mvp/proposal.md`。
 
 ## 验收判据(Criteria)在哪
 
@@ -28,4 +30,4 @@ Live 活体调试(Mode C)、TS/Go SDK、VSCode/JetBrains 插件、内置 eval �
 - 只描述可观测行为;内部类名、库选型、实现步骤进 design.md,不进 spec。
 - 用 **SHALL** 表述规范要求;需求以 `### Requirement:` 开头,场景必须以 `#### Scenario:`(恰好 4 个井号),用 WHEN/THEN。
 - 每一个 Requirement 至少一个 Scenario;无法触发的行为不入 spec。
-- 删除/修改需求必须带对应 change,禁止绕过 change 直接改写主规格(待基线归档后生效)。
+- 删除/修改需求必须带对应 change,禁止绕过 change 直接改写主规格。
