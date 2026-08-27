@@ -137,6 +137,7 @@ export default function ChainCanvas({
   selectedId,
   onSelect,
   divergentSteps,
+  pausedStep,
 }) {
   const canvasRef = useRef(null)
   const wrapRef = useRef(null)
@@ -161,9 +162,10 @@ export default function ChainCanvas({
       drawNode(ctx, node, {
         selected: node.id === selectedId,
         divergent: divergentSteps ? divergentSteps.has(node.step_index) : false,
+        paused: pausedStep != null && node.step_index === pausedStep,
       })
     }
-  }, [layout, selectedId, divergentSteps])
+  }, [layout, selectedId, divergentSteps, pausedStep])
 
   const hitTest = (e) => {
     const canvas = canvasRef.current

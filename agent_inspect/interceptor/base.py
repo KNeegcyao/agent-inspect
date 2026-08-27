@@ -5,6 +5,7 @@
 """
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import re
@@ -28,9 +29,10 @@ class _Rec:
 class Interceptor:
     """执行模式路由 + 决策点登记与落盘。sroute(同步)/ aroute(异步)。"""
 
-    def __init__(self, recorder: Recorder, controller=None) -> None:
+    def __init__(self, recorder: Recorder, controller=None, debug=None) -> None:
         self.recorder = recorder
         self.controller = controller
+        self.debug = debug  # DebugController(Mode C live 调试);None 则零行为变化
 
     # ------------------------------------------------------------------
     # 执行上下文
@@ -53,10 +55,19 @@ class Interceptor:
                 dry_run=plan.dry_run,
             )
             cursor.last_dp_id = self._prefix_last_dp(plan.trace_id, plan.origin_branch, plan.branch_from_step)
+            self._mark_live(cursor)
             return cursor, plan.trace_id, plan.branch_id
         trace, branch = self.recorder.create_trace_and_root("agent")
         cursor = ExecutionCursor(trace_id=trace.id, branch_id=branch.id, mode=MODE_RECORD)
+        self._mark_live(cursor)
         return cursor, trace.id, branch.id
+
+    def _mark_live(self, cursor: ExecutionCursor) -> None:
+        """live 调试控制器存在时:注册该 trace 的调试门并打标(Mode C 正交于 A/B)。"""
+        if self.debug is None:
+            return
+        cursor.live_debug = True
+        self.debug.ensure_gate(cursor.trace_id)
 
     def _prefix_last_dp(self, trace_id: str, branch_id: str, branch_from_step: int) -> Optional[str]:
         points = self.recorder.read_branch_points(trace_id, branch_id, 0, branch_from_step - 1)
@@ -97,6 +108,13 @@ class Interceptor:
         )
         if cursor.last_dp_id:
             dp.cause_edge = [cursor.last_dp_id]
+        # ---- Mode C live 调试:决策点边界咨询调试门(阻塞放行 / 替换输入)----
+        if cursor.live_debug and self.debug is not None:
+            mod = self.debug.consult(cursor.trace_id, dp)
+            if mod is not None:
+                self._apply_input_mod(dp, mod)
+                if make_modified_call is not None:
+                    call = make_modified_call(dp.input_context)
         start = time.perf_counter()
         err: Optional[BaseException] = None
         native: Any = None
@@ -143,6 +161,13 @@ class Interceptor:
         )
         if cursor.last_dp_id:
             dp.cause_edge = [cursor.last_dp_id]
+        # ---- Mode C live 调试:决策点边界咨询调试门(异步阻塞不卡事件循环)----
+        if cursor.live_debug and self.debug is not None:
+            mod = await asyncio.to_thread(self.debug.consult, cursor.trace_id, dp)
+            if mod is not None:
+                self._apply_input_mod(dp, mod)
+                if make_modified_call is not None:
+                    call = make_modified_call(dp.input_context)
         start = time.perf_counter()
         err: Optional[BaseException] = None
         native: Any = None

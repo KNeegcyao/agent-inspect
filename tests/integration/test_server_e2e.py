@@ -18,12 +18,12 @@ from agent_inspect.session import Session
 from tests.conftest import FakeLLM, run_agent
 
 
-def _get(base: str, path: str):
+def _get_raw(base: str, path: str):
     with urllib.request.urlopen(base + path, timeout=5) as r:
         return r.status, json.loads(r.read().decode("utf-8"))
 
 
-def _post(base: str, path: str, payload: dict):
+def _post_raw(base: str, path: str, payload: dict):
     req = urllib.request.Request(
         base + path,
         data=json.dumps(payload).encode("utf-8"),
@@ -39,6 +39,41 @@ def _post(base: str, path: str, payload: dict):
         except Exception:  # noqa: BLE001
             body = {}
         return e.code, body
+
+
+def _delete_raw(base: str, path: str):
+    req = urllib.request.Request(base + path, method="DELETE")
+    try:
+        with urllib.request.urlopen(req, timeout=5) as r:
+            return r.status, json.loads(r.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        try:
+            body = json.loads(e.read().decode("utf-8"))
+        except Exception:  # noqa: BLE001
+            body = {}
+        return e.code, body
+
+
+def _retry_conn(fn):
+    """Windows 全量负载下偶发的 10054(对端关闭空闲连接)重试一次。"""
+    try:
+        return fn()
+    except ConnectionResetError:
+        time.sleep(0.2)
+        return fn()
+
+
+# 全量负载下服务线程偶发回收空闲连接;读/写各重试一次,避免 10054 误报失败
+def _get(base: str, path: str):
+    return _retry_conn(lambda: _get_raw(base, path))
+
+
+def _post(base: str, path: str, payload: dict):
+    return _retry_conn(lambda: _post_raw(base, path, payload))
+
+
+def _delete(base: str, path: str):
+    return _retry_conn(lambda: _delete_raw(base, path))
 
 
 def _traces(base: str):
@@ -179,3 +214,112 @@ def test_ui_built_spa_served():
             assert "/assets/" in body  # Vite 打包产物引用
         finally:
             s.stop()
+
+
+def _delete(base: str, path: str):
+    req = urllib.request.Request(base + path, method="DELETE")
+    try:
+        with urllib.request.urlopen(req, timeout=5) as r:
+            return r.status, json.loads(r.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        try:
+            body = json.loads(e.read().decode("utf-8"))
+        except Exception:  # noqa: BLE001
+            body = {}
+        return e.code, body
+
+
+def _wait_debug_paused(base: str, tid: str, step: int, timeout: float = 15.0):
+    """轮询调试状态直至目标步骤暂停(spec 指令实时送达执行侧)。"""
+    deadline = time.time() + timeout
+    state = None
+    while time.time() < deadline:
+        _st, state = _get(base, f"/api/debug/{tid}/state")
+        if state.get("paused_at") == step:
+            return state
+        time.sleep(0.02)
+    raise AssertionError(f"trace 未在步骤 {step} 暂停,state={state}")
+
+
+def test_live_debug_mode_c_e2e(session):
+    """Mode C e2e:运行中 attach → 设断 → 暂停 → 步进 → 改输入 → 继续 → 落盘见差异。
+
+    覆盖 spec live-debug:附加即生效 / 断点命中暂停 / 单步 / 暂停点输入替换后继续;
+    全部走真实 HTTP 契约(spec 实时双向消息 / 面板指令实时送达执行侧)。
+    """
+    import threading
+
+    base = session.url
+    holder: dict = {}
+    start = threading.Event()
+    done = threading.Event()
+
+    def _agent_run():
+        try:
+            with session.trace() as tid:
+                holder["tid"] = tid
+                start.wait(15)  # 等面板完成 attach + 设断再放行(全量负载下放宽预算)
+                holder["outs"] = run_agent(
+                    session.interceptor, 5, FakeLLM(["s0", "s1", "s2", "s3", "s4"])
+                )
+        finally:
+            done.set()
+
+    th = threading.Thread(target=_agent_run, daemon=True)
+    th.start()
+
+    # 等待 trace 建立(running)
+    tid = None
+    deadline = time.time() + 15
+    while time.time() < deadline:
+        tid = holder.get("tid")
+        if tid:
+            break
+        time.sleep(0.02)
+    assert tid is not None, "agent trace 未在预期时间内建立"
+
+    # ---- attach ----
+    st, state = _post(base, f"/api/debug/{tid}/attach", {})
+    assert st == 200 and state["attached"] is True
+
+    # ---- 设断点:kind=llm(首个决策点命中)→ 暂停 step 0 ----
+    st, bp = _post(base, f"/api/debug/{tid}/breakpoints", {"kind": "llm"})
+    assert st == 200 and bp["kind"] == "llm"
+    start.set()  # 放行 agent → 首个决策点命中断点暂停
+    _wait_debug_paused(base, tid, 0)
+
+    # ---- 单步 → step 1 ----
+    st, _ = _post(base, f"/api/debug/{tid}/step", {})
+    assert st == 200
+    _wait_debug_paused(base, tid, 1)
+
+    # ---- 改输入并继续:step 1 的 messages[0].content → "EDITED" ----
+    st, res = _post(
+        base,
+        f"/api/debug/{tid}/modify",
+        {"step": 1, "field": "input_context.messages[0].content", "value": "EDITED"},
+    )
+    assert st == 200 and res["ok"] is True
+
+    # ---- 移除断点后继续放行 → agent 完成 ----
+    st, res = _delete(base, f"/api/debug/{tid}/breakpoints/{bp['id']}")
+    assert st == 200 and res["ok"] is True
+    st, _ = _post(base, f"/api/debug/{tid}/continue", {})
+    assert st == 200
+    assert done.wait(5), "agent 在 remove+continue 后未完成"
+    assert holder["outs"] == ["s0", "s1", "s2", "s3", "s4"]
+
+    # ---- 落盘可见差异:step1 输入已替换为 EDITED,step0 仍为原输入 ----
+    _st, data = _get(base, f"/api/traces/{tid}")
+    root = data["trace"]["root_branch_id"]
+    _st, pts = _get(base, f"/api/branches/{root}/points")
+    by_step = {p["step_index"]: p for p in pts}
+    assert by_step[0]["input_context"]["messages"][0]["content"] == "hi"
+    assert by_step[1]["input_context"]["messages"][0]["content"] == "EDITED"
+    assert [p["output"]["content"] for p in sorted(pts, key=lambda x: x["step_index"])] == [
+        "s0",
+        "s1",
+        "s2",
+        "s3",
+        "s4",
+    ]

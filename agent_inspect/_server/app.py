@@ -141,6 +141,98 @@ def create_app(session) -> FastAPI:
             return JSONResponse({"error": str(e)}, status_code=422)
         return {"branch": branch.to_dict(), "plan": plan.__dict__}
 
+    # ---- Mode C live 调试 ----
+    def _require_running_trace(trace_id: str):
+        t = session.store.get_trace(trace_id)
+        if t is None:
+            return None, JSONResponse({"error": "trace not found"}, status_code=404)
+        if t.lifecycle != m.LIFECYCLE_RUNNING:
+            return None, JSONResponse(
+                {"error": f"trace not running (lifecycle={t.lifecycle})"}, status_code=422
+            )
+        return t, None
+
+    @app.post("/api/debug/{trace_id}/attach")
+    async def debug_attach(trace_id: str):
+        _t, err = _require_running_trace(trace_id)
+        if err is not None:
+            return err
+        return session.debug_attach(trace_id)
+
+    @app.get("/api/debug/{trace_id}/state")
+    def debug_state(trace_id: str):
+        return session.debug_state(trace_id)
+
+    @app.get("/api/debug/{trace_id}/breakpoints")
+    def debug_list_breakpoints(trace_id: str):
+        if session.store.get_trace(trace_id) is None:
+            return JSONResponse({"error": "trace not found"}, status_code=404)
+        gate = session.debug.gate(trace_id)
+        return [b.to_dict() for b in (gate.breakpoints if gate else session.store.list_breakpoints(trace_id))]
+
+    @app.post("/api/debug/{trace_id}/breakpoints")
+    async def debug_add_breakpoint(trace_id: str, request: Request):
+        _t, err = _require_running_trace(trace_id)
+        if err is not None:
+            return err
+        body = await request.json()
+        kind = body.get("kind") or None
+        if kind is not None and kind not in (m.KIND_LLM, m.KIND_TOOL):
+            return JSONResponse({"error": f"invalid kind: {kind}"}, status_code=422)
+        bp = session.debug_add_breakpoint(
+            trace_id,
+            kind=kind,
+            agent_id=body.get("agent_id") or None,
+            condition=body.get("condition") or None,
+        )
+        return bp
+
+    @app.delete("/api/debug/{trace_id}/breakpoints/{bp_id}")
+    def debug_remove_breakpoint(trace_id: str, bp_id: str):
+        if session.debug_remove_breakpoint(trace_id, bp_id):
+            return {"ok": True, "breakpoint_id": bp_id}
+        return JSONResponse({"error": "breakpoint not found"}, status_code=404)
+
+    @app.post("/api/debug/{trace_id}/pause")
+    async def debug_pause(trace_id: str):
+        _t, err = _require_running_trace(trace_id)
+        if err is not None:
+            return err
+        session.debug_pause(trace_id)
+        return {"ok": True, "action": "pause"}
+
+    @app.post("/api/debug/{trace_id}/step")
+    async def debug_step(trace_id: str):
+        _t, err = _require_running_trace(trace_id)
+        if err is not None:
+            return err
+        session.debug_step(trace_id)
+        return {"ok": True, "action": "step"}
+
+    @app.post("/api/debug/{trace_id}/continue")
+    async def debug_continue(trace_id: str):
+        _t, err = _require_running_trace(trace_id)
+        if err is not None:
+            return err
+        session.debug_continue(trace_id)
+        return {"ok": True, "action": "continue"}
+
+    @app.post("/api/debug/{trace_id}/modify")
+    async def debug_modify(trace_id: str, request: Request):
+        _t, err = _require_running_trace(trace_id)
+        if err is not None:
+            return err
+        body = await request.json()
+        if "step" not in body or "field" not in body or "value" not in body:
+            return JSONResponse({"error": "step/field/value required"}, status_code=422)
+        session.debug_modify(
+            trace_id,
+            step=int(body["step"]),
+            field=str(body["field"]),
+            value=body["value"],
+        )
+        return {"ok": True, "action": "modify", "step": int(body["step"])}
+
     # ---- 实时事件(SSE)----
     @app.get("/api/events")
     async def events():

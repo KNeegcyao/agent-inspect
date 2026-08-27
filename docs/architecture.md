@@ -14,21 +14,22 @@
 │  ② 按执行模式上下文路由:                                    │
 │      Replay  → 返回 recorded output(不真调)                │
 │      Fork    → step≤起点 用 recorded;step>起点 真调        │
+│      Live    → 真调前咨询 DebugGate(断点/暂停/步进/改输入)  │
 │  ③ 落盘 + 经 SSE 推事件到面板                               │
 └────────────┬──────────────────────────────────────────────┘
-             │ 经 contextvars 携带 {trace_id,branch_id,mode,replay_cursor,branch_from_step}
+             │ 经 contextvars 携带 {trace_id,branch_id,mode,replay_cursor,branch_from_step,live_debug}
    ┌─────────▼─────────────────────────────────────────────┐
    │ Local Server(进程内嵌 FastAPI)                          │
    │   store/    SQLite:traces·branches·decision_points·     │
-   │             blobs·context_diffs                         │
-   │   session/  活跃 trace 的分支图 + fork 调度             │
-   │   api/      REST 查询 + SSE 事件流 + WS 调试指令         │
+   │             blobs·context_diffs·breakpoints             │
+   │   session/  活跃 trace 的分支图 + fork 调度 + DebugGate  │
+   │   api/      REST 查询 + SSE 事件流 + 调试指令             │
    └─────────┬─────────────────────────────────────────────┘
              └─ 托管单页 UI 资源
    ┌─────────▼─────────────────────────────────────────────┐
    │ Local Panel(单页 React + D3 + Canvas)                  │
-   │   决策链路树 / 决策点检查(f全文 prompt)/ Fork 入口 /   │
-   │   分支并排 / SSE 实时追加                                 │
+   │   决策链路树 / 决策点检查(f全文 prompt)/ Fork 入口 /     │
+   │   分支并排 / SSE 实时追加 / 调试工具条(attach·断点·step)  │
    └────────────────────────────────────────────────────────┘
 ```
 
@@ -38,13 +39,14 @@
 
 | 组件 | 位置 | 职责 | 不做 |
 |---|---|---|---|
-| **interceptor** | `agent_inspect/interceptor/` | 把 LLM/工具调用包成决策点路由点;按模式上下文决定真调/回放 | 不碰存储写盘细节(交 recorder)、不碰 UI |
+| **interceptor** | `agent_inspect/interceptor/` | 把 LLM/工具调用包成决策点路由点;按模式上下文决定真调/回放;live 时咨询调试门 | 不碰存储写盘细节(交 recorder)、不碰 UI |
 | **recorder** | `agent_inspect/recorder/` | 序列化决策点、增量快照、大对象去重、落 store | 不做执行模式路由(交 interceptor) |
 | **controller** | `agent_inspect/controller/` | SDK 侧与本地服务的双向通信;管理 trace/branch 与 fork 请求下发 | 不渲染(交 server/ui) |
-| **_server.store** | `agent_inspect/_server/store/` | SQLite schema + 读写 + 查询 | 不含分支调度逻辑 |
+| **_server.store** | `agent_inspect/_server/store/` | SQLite schema + 读写 + 查询(含 `breakpoints` 表) | 不含分支调度/调试状态机 |
 | **_server.session** | `agent_inspect/_server/session/` | 活跃 trace 的分支图维护与 fork 调度 | 不做事件解码(交 api) |
+| **debug** | `agent_inspect/debug.py` | DebugController(全局注册表) + DebugGate(per-trace 状态机:断点/暂停/步进/改输入) | 不碰 UI 事件循环(阻塞只在 agent 执行侧) |
 | **_server.api** | `agent_inspect/_server/api/` | REST/SSE/WS 端点、消息编解码、托管 UI 资源 | 不含业务状态(交 session/store) |
-| **ui**(TraceView) | `ui/` | 单页:决策树、检查、Fork 交互、并排、实时追加 | 不含任何 Agent 执行逻辑 |
+| **ui**(TraceView) | `ui/` | 单页:决策树、检查、Fork 交互、并排、实时追加、调试工具条 | 不含任何 Agent 执行逻辑 |
 
 跨组件数据流:Interceptor →(事件)→ api → SSE → UI;UI →(WS 指令)→ api → session → controller → 改 contextvars → Interceptor 换模式。详 [contracts.md](contracts.md)。
 
@@ -62,7 +64,11 @@ decision_points ( id PK, trace_id FK, branch_id FK, step_index, kind,          -
                   meta_json, cause_edge )                                      -- cause_edge: 指向引起本点的(多个)前序决策点
 blobs           ( hash PK, content, size, kind )                              -- content-addressed,大对象去重
 context_diffs   ( id PK, branch_id FK, step_index, diff_against_step, payload ) -- 增量上下文(d Against parent step)
+breakpoints     ( id PK, trace_id FK, kind, agent_id, condition_json, enabled, created_at ) -- Mode C 断点,跨会话保留
 ```
+
+- 决策点**登记即含 input_context**(执行前)→ 暂停点天然呈现"已登记、未回填"的待执行态,无需新表。
+- `DebugGate` 的暂停/步进/改输入是**进程内存瞬态**(不持久化);断点落 `breakpoints` 表跨会话保留。
 
 - `input_context_ref` / `output_ref`:小体积直存,大体积指向 `blobs.hash`。
 - `cause_edge`:**因果 DAG 的关键**——指向"由哪些前序决策点导致本点",表达分支/并行/重试,不止 parent-child。
@@ -77,17 +83,18 @@ context_diffs   ( id PK, branch_id FK, step_index, diff_against_step, payload ) 
 | **Record**(默认基线) | —(无回放) | — | 是 | 是(实时记录,供后续 Replay/Fork 消费) |
 | **Replay** | 用 recorded | (无后缀) | 否 | 否(只读) |
 | **Fork** | 用 recorded | — | step>起点 **是** | 是(入新 branch) |
-| **Live**(Phase 2) | 在 Record 基线上加条件断点,命中则阻塞执行侧 | 同 Record | 真调 | 是 |
+| **Live**(Mode C) | 在 Record 基线上加条件断点,命中则阻塞执行侧 | 同 Record | 真调 | 是 |
 
 > **Fork 不是两个功能**:前缀 recorded(确定性、免费)+ 后缀真调(可变、产生分支)。旧的"时间-travel(只读) vs 运行时改(读写)"矛盾在此被一个模型接住。
 >
-> **"三态"是面向用户的三种主动姿态**:Replay / Fork / (后续)Live。`record` 是不显式调用的**默认基线**(`agent_inspect.start()` 后正常运行即实时记录,Replay/Fork 都消费它的产物);Live(Mode C)是在 `record` 之上叠加条件断点,留 Phase 2。故**实现上的 mode 字段 = `record | replay | fork`**(live 另立),与"三态"叙事不自相矛盾——`record` 是基线,三态是叠加其上的主动姿态。
+> **"三态"是面向用户的三种主动姿态**:Replay / Fork / Live。`record` 是不显式调用的**默认基线**(`agent_inspect.start()` 后正常运行即实时记录,Replay/Fork 都消费它的产物);Live(Mode C)是在 `record` 之上叠加条件断点,已实现。故**实现上的 mode 字段 = `record | replay | fork`**(live 另立 `live_debug` 标记),与"三态"叙事不自相矛盾——`record` 是基线,三态是叠加其上的主动姿态。
 
 contextvars 上下文(进程内,贯穿 async):
 ```python
 {
-  trace_id, branch_id, mode,            # running? fork? 
+  trace_id, branch_id, mode,            # running? fork?
   replay_cursor, branch_from_step,      # fork 起点;replay 当前游标
+  live_debug,                           # Mode C:该 trace 已附加调试门
 }
 ```
 
@@ -95,7 +102,8 @@ contextvars 上下文(进程内,贯穿 async):
 
 > 每条锚点的完整 "Why"(竞品定位 / 三态统一 / 反事实 fork / 增量快照 / DAG 因果的来龙去脉)
 > 见 [proposal v2](../agent-inspect-proposal-v2.md) 的"差异化""三态统一""旗舰功能""关键技术难点"各节;
-> 内部实现(类名/库/接线)见 `openspec/changes/archive/2026-08-27-add-agent-inspect-mvp/design.md`。
+> 内部实现(类名/库/接线)见 `openspec/changes/archive/2026-08-27-add-agent-inspect-mvp/design.md`;
+> Mode C(活体调试)的 Why 与决策见 `openspec/changes/archive/2026-08-27-add-live-debug-mode-c/design.md`。
 
 - **站 OpenInference**,扩 `agent.step.cause` 因果边;不自造 OTel Agent 语义(互通优先)。
 - **决策结构是 DAG/森林**,非父子树;`cause_edge` 是 DAG 的实体。

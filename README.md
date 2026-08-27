@@ -4,7 +4,7 @@
 
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Status: pre-alpha](https://img.shields.io/badge/status-pre--alpha-orange.svg)](#status)
-[![Spec: 69 scenarios / 30 req](https://img.shields.io/badge/spec-69%20scenarios%20%2F%2030%20req-green.svg)](openspec/)
+[![Spec: 86 scenarios / 37 req](https://img.shields.io/badge/spec-86%20scenarios%20%2F%2037%20req-green.svg)](openspec/)
 
 **Agent-Inspect** is an interactive step-debugger for LLM Agents — not another tracing platform. It brings the Chrome DevTools / `pdb` experience to Agent development: drop in one line, and a local debug panel opens in your browser. You can inspect the full prompt at any decision point, change a prompt or a tool's return value, and fork a new branch to see what the Agent does *after the change* — without rerunning the whole thing.
 
@@ -66,10 +66,40 @@ This records a real LangChain ReAct agent run, forks step 0 with a modified prom
 
 ---
 
+## Live debugging (Mode C): pause a running agent
+
+Same one line, now with a **live debug toolbar** on the panel. No restart needed — while your agent is *running*, you can attach and intervene at decision-point boundaries:
+
+1. **Attach** to the running trace (it keeps executing; attach is observation-only).
+2. **Set a breakpoint** by decision kind (`llm` / `tool`) or by a text condition in the input.
+3. When a decision point hits the breakpoint, execution **pauses** — the point's full input/output is inspectable.
+4. **Step** executes exactly one more decision point, then pauses again.
+5. At a paused point, **edit the input** and **Continue** — that decision point then really runs with your edited input.
+6. **Continue** again to run to the next breakpoint or to completion.
+
+```python
+import agent_inspect
+
+agent_inspect.start()          # panel opens; your agent runs & records as usual
+
+# …run your LangChain/OpenAI agent (long-running). In the panel:
+#   Attach → 断点(llm) → 命中暂停 → Step / 改输入 → Continue
+```
+
+**Try it live** (no API key needed):
+
+```bash
+python examples/react_agent_live_debug.py   # 运行中 attach → 断点暂停 → 步进 → 改输入 → 继续
+```
+
+Live debugging shares the same interceptor as Record/Replay/Fork — no second engine. Debug state (breakpoints) persists across sessions; pause/step are transient. Scope is per-trace, so concurrent agents are never disturbed.
+
+---
+
 ## Core ideas
 
 1. **A decision is a unit.** Every LLM call and every tool call is recorded as a *decision point* — full prompt in, full response out, with latency and tokens.
-2. **Three modes, one engine.** *Replay* (read-only), *Fork* (the flagship), and (later) *Live* (attach to a running process with breakpoints). All three are one interceptor behaving three ways — not three features bolted together.
+2. **Three modes, one engine.** *Replay* (read-only), *Fork* (the flagship), and *Live* (attach to a running agent with conditional breakpoints, pause, step, continue — and edit an input at a paused point). All three are one interceptor behaving three ways — not three features bolted together.
 3. **Fork = recorded prefix + live suffix.** Free, deterministic replay up to your change; *real* execution after it. This is what unifies the old "time-travel (read-only) vs. modify-at-runtime (write)" contradiction.
 4. **Built on OpenInference, not against it.** We extend the OpenInference semantic conventions with an Agent causal edge (`agent.step.cause`) rather than inventing our own — so your traces interop with the observability world you already have.
 
@@ -80,11 +110,11 @@ This records a real LangChain ReAct agent run, forks step 0 with a modified prom
 **In the MVP:**
 - Python-only SDK; auto-instruments **LangChain** and the **OpenAI** SDK.
 - Replay (read-only) + **Counterfactual Fork** (the flagship).
+- **Live (Mode C)**: attach to a running agent, conditional breakpoints, pause / step / continue, edit an input at a paused point.
 - One-line launch with a local panel; local file storage; zero external backend.
-- Single-page React UI: decision tree, full-prompt inspection, fork interaction, branch compare.
+- Single-page React UI: decision tree, full-prompt inspection, fork interaction, branch compare, live debug toolbar.
 
 **Deliberately out (follow-up changes):**
-- Live mode (Mode C: attach + conditional breakpoints + step). Phase 2.
 - Fork side-effect sandbox. Phase 2 (for now: real execution is explicit, + a `dry_run` preview).
 - TS / Go SDKs; framework auto-instrumentation beyond LangChain/OpenAI.
 - VSCode / JetBrains plugins; built-in eval engine; ClickHouse; WASM large-graph rendering; multi-Agent cross-process tracing.
@@ -109,11 +139,11 @@ This repo is **spec-driven** — "align the spec, then write code" is mandatory,
 **Quickest sanity check** after cloning:
 ```bash
 python -m pip install -e ".[dev]" && pytest -q   # green
-openspec validate --all                            # 1 passed
+openspec validate --all                            # all specs pass
 cd web && npm install && npm run build             # green (UI)
 ```
 
-The MVP implementation change `add-agent-inspect-mvp` is **applied and archived**; its proposal → specs → design → tasks live at [`openspec/changes/archive/2026-08-27-add-agent-inspect-mvp/`](openspec/changes/archive/2026-08-27-add-agent-inspect-mvp/).
+The MVP implementation change `add-agent-inspect-mvp` and the Live debugging (Mode C) change `add-live-debug-mode-c` are **applied and archived**; their proposals → specs → design → tasks live at [`openspec/changes/archive/2026-08-27-add-agent-inspect-mvp/`](openspec/changes/archive/2026-08-27-add-agent-inspect-mvp/) and [`openspec/changes/archive/2026-08-27-add-live-debug-mode-c/`](openspec/changes/archive/2026-08-27-add-live-debug-mode-c/).
 
 ---
 
@@ -121,7 +151,7 @@ The MVP implementation change `add-agent-inspect-mvp` is **applied and archived*
 
 - **[docs/product.md](docs/product.md)** — the product positioning doc (pain, positioning, the three-mode model, roadmap, competitor contrast).
 - **[agent-inspect-proposal-v2.md](agent-inspect-proposal-v2.md)** — the full technical proposal (market framing, architecture, the critical decisions, risks).
-- **[openspec/](openspec/)** — the spec-driven source of truth (`openspec/specs/README.md` is the capability baseline; the merged MVP specs are the `fork/interception/recording/local-runtime/trace-ui` capabilities; the archived change `openspec/changes/archive/2026-08-27-add-agent-inspect-mvp/` holds proposal → design → tasks).
+- **[openspec/](openspec/)** — the spec-driven source of truth (`openspec/specs/README.md` is the capability baseline; the merged specs are the `fork/interception/recording/local-runtime/trace-ui/live-debug` capabilities; the archived changes `openspec/changes/archive/2026-08-27-add-agent-inspect-mvp/` and `openspec/changes/archive/2026-08-27-add-live-debug-mode-c/` hold proposal → design → tasks).
 
 Spec is source of truth; prose docs explain *why* the spec says what it says.
 
@@ -129,7 +159,7 @@ Spec is source of truth; prose docs explain *why* the spec says what it says.
 
 ## Status
 
-Pre-alpha / **MVP implemented, tested and archived**. The MVP (`add-agent-inspect-mvp`): one-line `agent_inspect.start()`, LangChain + OpenAI auto-instrumentation, Replay + Counterfactual Fork, local SQLite storage, single-page React panel. **38 tests green** (unit + integration + e2e), `openspec validate --all` passes, specs merged into baseline. UI rendering is verified in-browser. See [tasks](openspec/changes/archive/2026-08-27-add-agent-inspect-mvp/tasks.md).
+Pre-alpha / **MVP implemented, tested and archived**. The MVP (`add-agent-inspect-mvp`): one-line `agent_inspect.start()`, LangChain + OpenAI auto-instrumentation, Replay + Counterfactual Fork, local SQLite storage, single-page React panel. **Live debugging (Mode C)** (`add-live-debug-mode-c`): attach to a running agent, conditional breakpoints, pause / step / continue, edit input at a paused point. **52 tests green** (unit + integration + e2e), `openspec validate --all` passes, specs merged into baseline. UI rendering is verified in-browser. See [tasks](openspec/changes/archive/2026-08-27-add-live-debug-mode-c/tasks.md).
 
 ## License
 

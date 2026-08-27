@@ -478,3 +478,147 @@ body {
   color: var(--muted);
   font-weight: 500;
 }
+
+/* ---- Mode C 调试工具条 ---- */
+.debug-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+.debug-label {
+  color: var(--muted);
+  font-size: 12px;
+}
+.debug-hint {
+  color: var(--muted);
+  font-size: 12px;
+}
+.debug-attached {
+  color: var(--ok);
+  font-size: 12px;
+  border: 1px solid var(--ok);
+  border-radius: 10px;
+  padding: 1px 8px;
+}
+.debug-btn {
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-family: var(--mono);
+  font-size: 12px;
+  cursor: pointer;
+}
+.debug-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: #fff;
+}
+.debug-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.debug-btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.debug-btn.primary:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+.debug-btn.attach {
+  background: var(--ok);
+  border-color: var(--ok);
+  color: #06281b;
+  font-weight: 600;
+}
+.debug-bps {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.bp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #0b1020;
+  color: var(--accent-2);
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  padding: 1px 6px 1px 8px;
+  font-size: 11px;
+}
+.bp-del {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 0 2px;
+}
+.bp-del:hover {
+  color: var(--danger);
+}
+.bp-form {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-basis: 100%;
+  flex-wrap: wrap;
+  padding: 6px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.bp-form select,
+.bp-form input {
+  background: #0b1020;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.bp-form input {
+  flex: 1;
+  min-width: 120px;
+}
+.debug-err {
+  color: var(--danger);
+  font-size: 12px;
+}
+
+/* ---- 暂停点面板 ---- */
+.pause-panel {
+  border-color: var(--ok);
+}
+.pause-panel .panel-head h3 {
+  color: var(--ok);
+}
+.pause-kind {
+  font-size: 11px;
+  padding: 1px 8px;
+  border-radius: 10px;
+}
+.pause-kind.llm {
+  color: #93c5fd;
+  border: 1px solid #3b82f6;
+}
+.pause-kind.tool {
+  color: #fcd34d;
+  border: 1px solid #f59e0b;
+}
+.pause-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+.pause-actions .debug-btn {
+  flex: 1;
+  text-align: center;
+}

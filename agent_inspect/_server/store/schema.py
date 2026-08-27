@@ -57,6 +57,18 @@ CREATE TABLE IF NOT EXISTS context_diffs (
 );
 
 CREATE INDEX IF NOT EXISTS idx_ctx_branch ON context_diffs(branch_id, step_index);
+
+CREATE TABLE IF NOT EXISTS breakpoints (
+    id TEXT PRIMARY KEY,
+    trace_id TEXT NOT NULL,
+    kind TEXT,
+    agent_id TEXT,
+    condition TEXT,
+    enabled INTEGER NOT NULL,
+    created_at REAL NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_bp_trace ON breakpoints(trace_id);
 """
 
 

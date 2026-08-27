@@ -44,6 +44,9 @@ export default function App() {
   const [selectedId, setSelectedId] = useState(null)
   const [conn, setConn] = useState('connecting')
   const [error, setError] = useState(null)
+  const [debugState, setDebugState] = useState(null) // {attached, paused_at, waiting, breakpoints}
+  const [pausedPayload, setPausedPayload] = useState(null) // trace.paused 载荷(完整输入)
+  const [forkFromStep, setForkFromStep] = useState(null) // "在此 Fork" 定位的起点步骤
 
   // 供稳定 SSE 回调读取的 ref(避免因依赖变化反复重连)
   const ownPointsRef = useRef(ownPoints)
@@ -72,6 +75,9 @@ export default function App() {
       ownPointsRef.current = {}
       setSelectedId(null)
       setCompareBranchId(null)
+      setDebugState(null)
+      setPausedPayload(null)
+      api.debugState(id).then(setDebugState).catch(() => {})
       const root = data.trace.root_branch_id
       const hasRoot = root && data.branches.some((b) => b.id === root)
       setActiveBranchId(hasRoot ? root : data.branches[0]?.id || null)
@@ -96,19 +102,42 @@ export default function App() {
     return m
   }, [traceData])
 
-  // ---- 实时 SSE:追加决策点 / 刷新活跃 trace / 刷新列表 ----
+  // ---- 实时 SSE:追加决策点 / 刷新活跃 trace / 刷新列表 / 调试状态 ----
   useEffect(() => {
     const es = openEvents((event, payload) => {
-      if (event !== 'decision_point' || !payload) return
-      const bid = payload.branch_id
-      const next = upsertPoint(ownPointsRef.current[bid] || [], payload)
-      ownPointsRef.current[bid] = next
-      setOwnPoints((prev) => ({ ...prev, [bid]: next }))
+      if (!payload) return
       const td = traceDataRef.current
-      if (td && payload.trace_id === td.trace.id) {
+      const activeId = td?.trace?.id
+      const onActiveTrace = activeId && payload.trace_id === activeId
+      if (event === 'decision_point') {
+        const bid = payload.branch_id
+        const next = upsertPoint(ownPointsRef.current[bid] || [], payload)
+        ownPointsRef.current[bid] = next
+        setOwnPoints((prev) => ({ ...prev, [bid]: next }))
+        if (onActiveTrace) {
+          api.getTrace(payload.trace_id).then(setTraceData).catch(() => {})
+        }
+        loadTraces()
+      }
+      // ---- Mode C live 调试事件 ----
+      if (event === 'trace.attached' && onActiveTrace) {
+        api.debugState(payload.trace_id).then(setDebugState).catch(() => {})
+      }
+      if (event === 'trace.paused' && onActiveTrace) {
+        setPausedPayload(payload)
+        api.debugState(payload.trace_id).then(setDebugState).catch(() => {})
         api.getTrace(payload.trace_id).then(setTraceData).catch(() => {})
       }
-      loadTraces()
+      if (event === 'trace.resumed' && onActiveTrace) {
+        setPausedPayload(null)
+        api.debugState(payload.trace_id).then(setDebugState).catch(() => {})
+      }
+      if (
+        (event === 'breakpoint.set' || event === 'breakpoint.removed') &&
+        onActiveTrace
+      ) {
+        api.debugState(payload.trace_id).then(setDebugState).catch(() => {})
+      }
     }, setConn)
     return () => es.close()
   }, [loadTraces])
@@ -145,6 +174,41 @@ export default function App() {
   }, [activeChain, compareChain, selectedId])
 
   const activeBranch = activeBranchId ? branchesById[activeBranchId] : null
+
+  // ---- Mode C 调试指令(统一捕获错误 + 刷新状态)----
+  const debugCmd = useCallback(async (fn) => {
+    const id = traceDataRef.current?.trace?.id
+    if (!id) return
+    try {
+      await fn(id)
+      setDebugState(await api.debugState(id))
+    } catch (e) {
+      setError(e.message)
+    }
+  }, [])
+  const onDebugAttach = useCallback(() => debugCmd((id) => api.debugAttach(id)), [debugCmd])
+  const onDebugPause = useCallback(() => debugCmd((id) => api.debugPause(id)), [debugCmd])
+  const onDebugStep = useCallback(() => debugCmd((id) => api.debugStep(id)), [debugCmd])
+  const onDebugContinue = useCallback(() => {
+    debugCmd((id) => api.debugContinue(id))
+    setPausedPayload(null)
+  }, [debugCmd])
+  const onDebugAddBreakpoint = useCallback(
+    (payload) => debugCmd((id) => api.debugAddBreakpoint(id, payload)),
+    [debugCmd]
+  )
+  const onDebugRemoveBreakpoint = useCallback(
+    (bpId) => debugCmd((id) => api.debugRemoveBreakpoint(id, bpId)),
+    [debugCmd]
+  )
+  const onDebugModify = useCallback(
+    (step, field, value) => debugCmd((id) => api.debugModify(id, { step, field, value })),
+    [debugCmd]
+  )
+
+  // 暂停点高亮:优先实时载荷,其次轮询状态
+  const pausedStep =
+    pausedPayload?.step_index ?? debugState?.paused_at ?? null
 
   return (
     <div className="app">
@@ -239,6 +303,18 @@ export default function App() {
               <div className="toolbar-note">
                 {activeBranch?.note && <span>备注:{activeBranch.note}</span>}
               </div>
+              <DebugToolbar
+                traceId={traceData.trace.id}
+                running={traceData.trace.lifecycle === 'running'}
+                debug={debugState}
+                paused={pausedPayload}
+                onAttach={onDebugAttach}
+                onPause={onDebugPause}
+                onStep={onDebugStep}
+                onContinue={onDebugContinue}
+                onAddBreakpoint={onDebugAddBreakpoint}
+                onRemoveBreakpoint={onDebugRemoveBreakpoint}
+              />
             </div>
 
             <div className={`canvas-area ${compareChain.length ? 'side-by-side' : ''}`}>
@@ -256,6 +332,7 @@ export default function App() {
                     points={activeChain}
                     selectedId={selectedId}
                     divergentSteps={divergentSteps}
+                    pausedStep={pausedStep}
                     onSelect={(n) => {
                       setSelectedId(n.id)
                     }}
@@ -277,6 +354,7 @@ export default function App() {
                     points={compareChain}
                     selectedId={selectedId}
                     divergentSteps={divergentSteps}
+                    pausedStep={pausedStep}
                     onSelect={(n) => setSelectedId(n.id)}
                   />
                 </div>
@@ -287,8 +365,19 @@ export default function App() {
       </main>
 
       <aside className="inspector">
+        {pausedPayload && (
+          <PausePanel
+            payload={pausedPayload}
+            onStep={onDebugStep}
+            onContinue={onDebugContinue}
+            onModify={onDebugModify}
+          />
+        )}
         {selected ? (
-          <PointDetails point={selected} onFork={() => setFromStep(selected.step_index)} />
+          <PointDetails
+            point={selected}
+            onFork={() => setForkFromStep(selected.step_index)}
+          />
         ) : (
           <div className="inspector-hint">
             点击链路中的决策点查看完整输入输出,并可发起 Fork
@@ -299,7 +388,7 @@ export default function App() {
           <ForkPanel
             traceData={traceData}
             branchId={activeBranchId}
-            defaultStep={selected?.step_index}
+            defaultStep={forkFromStep ?? selected?.step_index}
             onCreated={(branch) => {
               api.getTrace(traceData.trace.id).then(setTraceData).catch(() => {})
               setActiveBranchId(branch.id)
@@ -523,6 +612,209 @@ function ForkPanel({ traceData, branchId, defaultStep, onCreated }) {
       <button className="fork-btn wide" disabled={busy} onClick={submit}>
         {busy ? '创建中…' : '创建 Fork 分支'}
       </button>
+    </section>
+  )
+}
+
+// ---- Mode C 调试工具条(Attach / 断点 / Pause / Step / Continue)----
+function DebugToolbar({
+  running,
+  debug,
+  paused,
+  onAttach,
+  onPause,
+  onStep,
+  onContinue,
+  onAddBreakpoint,
+  onRemoveBreakpoint,
+}) {
+  const [bpOpen, setBpOpen] = useState(false)
+  const [bpKind, setBpKind] = useState('')
+  const [bpCond, setBpCond] = useState('')
+  const [err, setErr] = useState(null)
+  const attached = !!debug?.attached
+  const waiting = !!debug?.waiting || paused != null
+  const bps = debug?.breakpoints || []
+
+  const submitBp = async () => {
+    setErr(null)
+    if (!bpKind && !bpCond.trim()) {
+      setErr('需指定类型或命中子串')
+      return
+    }
+    try {
+      await onAddBreakpoint({
+        kind: bpKind || undefined,
+        condition: bpCond.trim() || undefined,
+      })
+      setBpKind('')
+      setBpCond('')
+      setBpOpen(false)
+    } catch (e) {
+      setErr(e.message)
+    }
+  }
+
+  return (
+    <div className="debug-toolbar">
+      <span className="debug-label">调试</span>
+      {!running ? (
+        <span className="debug-hint">仅运行中可附加</span>
+      ) : !attached ? (
+        <button className="debug-btn attach" onClick={onAttach}>
+          Attach
+        </button>
+      ) : (
+        <>
+          <span className="debug-attached">已附加</span>
+          <button
+            className="debug-btn"
+            onClick={() => {
+              setBpOpen((v) => !v)
+              setErr(null)
+            }}
+          >
+            断点{bps.length ? `(${bps.length})` : ''}
+          </button>
+          <button className="debug-btn" disabled={waiting} onClick={onPause}>
+            Pause
+          </button>
+          <button className="debug-btn" disabled={!waiting} onClick={onStep}>
+            Step
+          </button>
+          <button
+            className="debug-btn primary"
+            disabled={!waiting}
+            onClick={onContinue}
+          >
+            Continue
+          </button>
+        </>
+      )}
+
+      {attached && (
+        <div className="debug-bps">
+          {bps.map((b) => (
+            <span
+              key={b.id}
+              className="bp-chip"
+              title={b.condition ? `命中:"${b.condition}"` : ''}
+            >
+              {b.kind ? kindLabel(b.kind) : '输入'}
+              {b.condition ? `:"${b.condition}"` : ''}
+              <button
+                className="bp-del"
+                title="删除断点"
+                onClick={() => onRemoveBreakpoint(b.id)}
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {attached && bpOpen && (
+        <div className="bp-form">
+          <select
+            value={bpKind}
+            onChange={(e) => setBpKind(e.target.value)}
+          >
+            <option value="">任意类型</option>
+            <option value="llm">LLM</option>
+            <option value="tool">工具</option>
+          </select>
+          <input
+            placeholder="命中子串(如 secret)"
+            value={bpCond}
+            onChange={(e) => setBpCond(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && submitBp()}
+          />
+          <button className="debug-btn primary" onClick={submitBp}>
+            添加
+          </button>
+          {err && <span className="debug-err">{err}</span>}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ---- 暂停点面板:完整输入检查 + 输入可编辑(应用修改并继续)----
+function PausePanel({ payload, onStep, onContinue, onModify }) {
+  const [field, setField] = useState('input_context.messages[0].content')
+  const [valueText, setValueText] = useState('')
+  const [err, setErr] = useState(null)
+  const [busy, setBusy] = useState(false)
+
+  const applyModify = async () => {
+    setErr(null)
+    if (!field.trim() || !valueText.trim()) {
+      setErr('需填写字段路径与新值(JSON)')
+      return
+    }
+    let value
+    try {
+      value = JSON.parse(valueText)
+    } catch {
+      setErr('新值不是合法 JSON')
+      return
+    }
+    setBusy(true)
+    try {
+      await onModify(payload.step_index, field.trim(), value)
+    } catch (e) {
+      setErr(e.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <section className="panel pause-panel">
+      <div className="panel-head">
+        <h3>已暂停 · 步骤 {payload.step_index}</h3>
+        <span className={`pause-kind ${payload.kind}`}>
+          {kindLabel(payload.kind)}
+        </span>
+      </div>
+      <div className="kv-row">
+        <span>agent</span>
+        <code>{payload.agent_id}</code>
+      </div>
+      <JsonBlock label="完整输入(检查用)" data={payload.input_context} />
+      <div className="field">
+        <span>修改字段(JSON 路径,可省略 input_context. 前缀)</span>
+        <input
+          value={field}
+          onChange={(e) => setField(e.target.value)}
+          placeholder="input_context.messages[0].content"
+        />
+      </div>
+      <div className="field">
+        <span>新值(JSON)</span>
+        <textarea
+          value={valueText}
+          onChange={(e) => setValueText(e.target.value)}
+          placeholder='例如 "新的 prompt"'
+        />
+      </div>
+      {err && <div className="err-block">{err}</div>}
+      <div className="pause-actions">
+        <button className="debug-btn" onClick={onStep}>
+          单步
+        </button>
+        <button className="debug-btn" onClick={onContinue}>
+          继续
+        </button>
+        <button
+          className="debug-btn primary"
+          disabled={busy}
+          onClick={applyModify}
+        >
+          {busy ? '应用中…' : '应用修改并继续'}
+        </button>
+      </div>
     </section>
   )
 }

@@ -27,6 +27,7 @@ class ExecutionCursor:
         "replay_cursor",
         "branch_from_step",
         "dry_run",
+        "live_debug",
         "last_dp_id",
         "_step_index",
         "_lock",
@@ -42,6 +43,7 @@ class ExecutionCursor:
         replay_cursor: int = 0,
         branch_from_step: int = 0,
         dry_run: bool = False,
+        live_debug: bool = False,
     ) -> None:
         self.trace_id = trace_id
         self.branch_id = branch_id
@@ -51,6 +53,8 @@ class ExecutionCursor:
         self.replay_cursor = replay_cursor
         self.branch_from_step = branch_from_step
         self.dry_run = dry_run
+        # Mode C:live 调试标记(决策点边界咨询调试门;record/replay/fork 之上正交)
+        self.live_debug = live_debug
         self.last_dp_id: Optional[str] = None
         self._step_index = -1
         self._lock = threading.Lock()

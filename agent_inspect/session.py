@@ -22,6 +22,7 @@ from ._context import reset_cursor, set_cursor
 from ._models import LIFECYCLE_ABORTED, LIFECYCLE_DONE
 from ._server.app import EventHub, create_app
 from ._server.store.queries import Store
+from .debug import DebugController
 from .fork import ForkController
 from .interceptor.base import Interceptor
 from .interceptor.langchain_patcher import LangChainPatcher
@@ -66,7 +67,8 @@ class Session:
             on_event=self.events.publish,
         )
         self.fork = ForkController(self.store)
-        self.interceptor = Interceptor(self.recorder, controller=self.fork)
+        self.debug = DebugController(self.store, on_event=self.events.publish)
+        self.interceptor = Interceptor(self.recorder, controller=self.fork, debug=self.debug)
         self._patchers = [LangChainPatcher(), OpenAIPatcher()]
         self._server: Optional[uvicorn.Server] = None
         self._thread: Optional[threading.Thread] = None
@@ -139,9 +141,57 @@ class Session:
     def finish_trace(self, trace_id: str, lifecycle: str = LIFECYCLE_DONE) -> None:
         """把 trace 标记为终态(done / aborted),供面板区分进行中/完成/中止。"""
         self.store.set_trace_lifecycle(trace_id, lifecycle)
+        # 终态后该 trace 不再产生决策点,释放其调试门(断点已持久化,重附加可恢复)
+        self.debug.drop_gate(trace_id)
 
     def abort_trace(self, trace_id: str) -> None:
         self.finish_trace(trace_id, LIFECYCLE_ABORTED)
+
+    # ---- Mode C live 调试:面板指令直接送达到执行侧 ----
+    def debug_attach(self, trace_id: str) -> dict:
+        gate = self.debug.ensure_gate(trace_id)
+        first = gate.attach()
+        if first:
+            self.events.publish("trace.attached", {"trace_id": trace_id})
+        return gate.state()
+
+    def debug_add_breakpoint(self, trace_id: str, **kw) -> dict:
+        gate = self.debug.ensure_gate(trace_id)
+        return gate.add_breakpoint(**kw).to_dict()
+
+    def debug_remove_breakpoint(self, trace_id: str, bp_id: str) -> bool:
+        gate = self.debug.gate(trace_id)
+        if gate is None:
+            return False
+        return gate.remove_breakpoint(bp_id)
+
+    def debug_pause(self, trace_id: str) -> None:
+        gate = self.debug.gate(trace_id)
+        if gate is not None:
+            gate.pause()
+
+    def debug_step(self, trace_id: str) -> None:
+        gate = self.debug.gate(trace_id)
+        if gate is not None:
+            gate.step()
+
+    def debug_continue(self, trace_id: str) -> None:
+        gate = self.debug.gate(trace_id)
+        if gate is not None:
+            gate.resume()
+
+    def debug_modify(self, trace_id: str, step: int, field: str, value) -> None:
+        gate = self.debug.gate(trace_id)
+        if gate is not None:
+            gate.modify(step, field, value)
+            self.events.publish(
+                "point.modified",
+                {"trace_id": trace_id, "step_index": step, "field": field},
+            )
+
+    def debug_state(self, trace_id: str) -> dict:
+        gate = self.debug.gate(trace_id)
+        return gate.state() if gate is not None else {"trace_id": trace_id, "attached": False}
 
     @contextmanager
     def trace(self, agent_name: str = "agent") -> Iterator[str]:

@@ -105,5 +105,29 @@ class Trace:
         }
 
 
+@dataclass
+class Breakpoint:
+    """条件断点(kind / agent_id / 输入子串命中;不做任意代码)。"""
+
+    id: str
+    trace_id: str
+    kind: Optional[str] = None
+    agent_id: Optional[str] = None
+    condition: Optional[str] = None
+    enabled: bool = True
+    created_at: Optional[float] = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "trace_id": self.trace_id,
+            "kind": self.kind,
+            "agent_id": self.agent_id,
+            "condition": self.condition,
+            "enabled": self.enabled,
+            "created_at": self.created_at,
+        }
+
+
 def now() -> float:
     return time.time()

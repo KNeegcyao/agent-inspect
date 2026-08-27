@@ -307,6 +307,50 @@ class Store:
             ).fetchall()
         return [(r[0], r[1], _json_loads(r[2])) for r in rows]
 
+    # ---- breakpoints (Mode C live debug,跨会话保留)----
+    def add_breakpoint(
+        self,
+        trace_id: str,
+        *,
+        kind: Optional[str] = None,
+        agent_id: Optional[str] = None,
+        condition: Optional[str] = None,
+    ) -> m.Breakpoint:
+        bp = m.Breakpoint(
+            id=m.new_id("bp"),
+            trace_id=trace_id,
+            kind=kind,
+            agent_id=agent_id,
+            condition=condition,
+            enabled=True,
+            created_at=m.now(),
+        )
+        with self._lock:
+            self._conn.execute(
+                "INSERT INTO breakpoints(id, trace_id, kind, agent_id, condition, enabled, created_at) "
+                "VALUES(?,?,?,?,?,?,?)",
+                (bp.id, bp.trace_id, bp.kind, bp.agent_id, bp.condition, 1, bp.created_at),
+            )
+            self._conn.commit()
+        return bp
+
+    def list_breakpoints(self, trace_id: str) -> list[m.Breakpoint]:
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT id, trace_id, kind, agent_id, condition, enabled, created_at "
+                "FROM breakpoints WHERE trace_id=? ORDER BY created_at",
+                (trace_id,),
+            ).fetchall()
+        return [m.Breakpoint(*r) for r in rows]
+
+    def remove_breakpoint(self, trace_id: str, bp_id: str) -> bool:
+        with self._lock:
+            cur = self._conn.execute(
+                "DELETE FROM breakpoints WHERE trace_id=? AND id=?", (trace_id, bp_id)
+            )
+            self._conn.commit()
+        return cur.rowcount > 0
+
 
 def _json_dumps(obj: Any) -> str:
     return json.dumps(obj, ensure_ascii=False, sort_keys=True, default=str)

@@ -32,6 +32,50 @@ export const api = {
       body: JSON.stringify(payload),
     }).then(parse)
   },
+  // ---- Mode C live 调试 ----
+  debugAttach(traceId) {
+    return fetch(`/api/debug/${encodeURIComponent(traceId)}/attach`, {
+      method: 'POST',
+    }).then(parse)
+  },
+  debugState(traceId) {
+    return fetch(`/api/debug/${encodeURIComponent(traceId)}/state`).then(parse)
+  },
+  debugAddBreakpoint(traceId, payload) {
+    return fetch(`/api/debug/${encodeURIComponent(traceId)}/breakpoints`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }).then(parse)
+  },
+  debugRemoveBreakpoint(traceId, bpId) {
+    return fetch(
+      `/api/debug/${encodeURIComponent(traceId)}/breakpoints/${encodeURIComponent(bpId)}`,
+      { method: 'DELETE' }
+    ).then(parse)
+  },
+  debugPause(traceId) {
+    return fetch(`/api/debug/${encodeURIComponent(traceId)}/pause`, {
+      method: 'POST',
+    }).then(parse)
+  },
+  debugStep(traceId) {
+    return fetch(`/api/debug/${encodeURIComponent(traceId)}/step`, {
+      method: 'POST',
+    }).then(parse)
+  },
+  debugContinue(traceId) {
+    return fetch(`/api/debug/${encodeURIComponent(traceId)}/continue`, {
+      method: 'POST',
+    }).then(parse)
+  },
+  debugModify(traceId, payload) {
+    return fetch(`/api/debug/${encodeURIComponent(traceId)}/modify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }).then(parse)
+  },
 }
 
 // SSE 事件流:event = "decision_point" | "ping";payload 为 JSON。
