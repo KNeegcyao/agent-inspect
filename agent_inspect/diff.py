@@ -39,6 +39,7 @@ def _chain_steps(store, serializer, context_snap, branch_id: str, upto: int, inh
         if p.step_index >= upto:
             break
         resolved = serializer.resolve_dp(store, p, context_snap)
+        resolved["source_branch_id"] = branch_id
         resolved["inherited"] = inherited
         own.append(resolved)
     parent = branch.parent_branch_id
@@ -72,13 +73,18 @@ def diff_chains(left: list[dict], right: list[dict]) -> tuple[list[dict], dict[s
             steps.append(_step(idx, STEP_ONLY_LEFT, a, None))
             counts[STEP_ONLY_LEFT] += 1
         else:
-            differs = (
-                a.get("kind") != b.get("kind")
-                or _json_cmp(a.get("output"), b.get("output")) != 0
-                or _json_cmp(a.get("input_context"), b.get("input_context")) != 0
-            )
-            status = STEP_DIFF if differs else STEP_SAME
-            fields = diff_fields(a, b) if differs else []
+            # 同源同 step:来自共同祖先的同一记录,无需比较内容
+            if a.get("source_branch_id") and a.get("source_branch_id") == b.get("source_branch_id"):
+                status = STEP_SAME
+                fields = []
+            else:
+                differs = (
+                    a.get("kind") != b.get("kind")
+                    or _json_cmp(a.get("output"), b.get("output")) != 0
+                    or _json_cmp(a.get("input_context"), b.get("input_context")) != 0
+                )
+                status = STEP_DIFF if differs else STEP_SAME
+                fields = diff_fields(a, b) if differs else []
             steps.append(_step(idx, status, a, b, fields))
             counts[status] += 1
     return steps, counts

@@ -8,6 +8,7 @@ import {
   lifecycleLabel,
   originLabel,
 } from './chain.js'
+import BranchDiffView from './components/BranchDiffView.jsx'
 import ChainCanvas from './components/ChainCanvas.jsx'
 
 const LIFE_FILTERS = [
@@ -331,17 +332,24 @@ export default function App() {
               />
             </div>
 
-            <div className={`canvas-area ${compareChain.length ? 'side-by-side' : ''}`}>
+            <div className={`canvas-area ${compareChain.length ? 'diff-mode' : ''}`}>
               {activeChain.length === 0 ? (
                 <div className="empty-state">
                   <h2>该分支尚无决策点</h2>
                   <p>Agent 执行产生决策点后会实时追加到这里</p>
                 </div>
+              ) : compareChain.length > 0 ? (
+                <BranchDiffView
+                  activeChain={activeChain}
+                  compareChain={compareChain}
+                  diffData={diffData}
+                  selectedId={selectedId}
+                  onSelect={(_stepIndex, pointId) => setSelectedId(pointId)}
+                  activeBranchId={activeBranchId}
+                  compareBranchId={compareBranchId}
+                />
               ) : (
                 <div className="canvas-col">
-                  {compareChain.length > 0 && (
-                    <div className="col-label">主分支 · {activeBranch?.id.slice(-8)}</div>
-                  )}
                   <ChainCanvas
                     points={activeChain}
                     selectedId={selectedId}
@@ -350,27 +358,6 @@ export default function App() {
                     onSelect={(n) => {
                       setSelectedId(n.id)
                     }}
-                  />
-                </div>
-              )}
-
-              {compareChain.length > 0 && (
-                <div className="canvas-col">
-                  <div className="col-label">
-                    对比分支 · {compareBranchId?.slice(-8)}
-                    {diffData && (
-                      <span className="divergence-count">
-                        同 {diffData.summary.same} · 异 {diffData.summary.diff} · 仅左{' '}
-                        {diffData.summary.only_left} · 仅右 {diffData.summary.only_right}
-                      </span>
-                    )}
-                  </div>
-                  <ChainCanvas
-                    points={compareChain}
-                    selectedId={selectedId}
-                    diffStatus={diffStatus}
-                    pausedStep={pausedStep}
-                    onSelect={(n) => setSelectedId(n.id)}
                   />
                 </div>
               )}

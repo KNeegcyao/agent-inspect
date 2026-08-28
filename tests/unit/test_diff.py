@@ -20,7 +20,7 @@ from agent_inspect._models import ORIGIN_FORK, ORIGIN_RECORD
 from tests.conftest import FakeLLM, run_agent
 
 
-def _pt(idx, output=None, input_ctx=None, kind="llm"):
+def _pt(idx, output=None, input_ctx=None, kind="llm", source_branch_id=None):
     return {
         "id": f"p{idx}",
         "step_index": idx,
@@ -32,6 +32,7 @@ def _pt(idx, output=None, input_ctx=None, kind="llm"):
         "cause_edge": [],
         "meta": {},
         "inherited": False,
+        "source_branch_id": source_branch_id,
     }
 
 
@@ -83,6 +84,38 @@ def test_diff_input_diff_marks_diff():
         "right": "INJECTED",
         "status": FIELD_CHANGED,
     }
+
+
+def test_diff_same_source_branch_short_circuits():
+    """同源同 step 的记录直接判 same,避免输入上下文级联扩散(spec 共享前缀应判定为 same)。"""
+    a = _pt(
+        0,
+        {"content": "a"},
+        {"messages": [{"role": "user", "content": "hi"}]},
+        source_branch_id="br_shared",
+    )
+    b = _pt(
+        0,
+        {"content": "DIFFERENT"},
+        {"messages": [{"role": "user", "content": "INJECTED"}]},
+        source_branch_id="br_shared",
+    )
+    steps, _ = diff_chains([a], [b])
+    assert steps[0]["status"] == STEP_SAME
+    assert "fields" not in steps[0] or steps[0]["fields"] == []
+
+
+def test_diff_different_source_branches_fall_back_to_content():
+    """不同来源分支仍按内容比较,不短路。"""
+    a = _pt(0, {"content": "a"}, source_branch_id="br_a")
+    b = _pt(0, {"content": "a"}, source_branch_id="br_b")
+    steps, _ = diff_chains([a], [b])
+    assert steps[0]["status"] == STEP_SAME  # 内容相同仍 same
+    # 内容不同时应 diff
+    c = _pt(0, {"content": "a"}, source_branch_id="br_a")
+    d = _pt(0, {"content": "b"}, source_branch_id="br_b")
+    steps2, _ = diff_chains([c], [d])
+    assert steps2[0]["status"] == STEP_DIFF
 
 
 def test_diff_field_only_on_one_side():
@@ -188,6 +221,16 @@ def test_build_chain_includes_shared_prefix(env):
     assert [p["output"]["content"] for p in chain[1:]] == ["X", "Y"]
     # 原记录分支 origin 不变
     assert env.store.list_branches(trace.id)[0].origin == ORIGIN_RECORD
+
+
+def test_build_chain_tags_source_branch_id(env):
+    """完整链中每个点都标记来源分支:前缀来自父分支,后缀来自本分支。"""
+    trace, root = _record(env, 3, ["a", "b", "c"])
+    branch = _fork_run(env, trace, root.id, 1, ["X", "Y"])
+    chain = build_chain(env.store, env.recorder.serializer, env.recorder.context_snap, branch.id)
+    assert chain[0]["source_branch_id"] == root.id
+    assert chain[1]["source_branch_id"] == branch.id
+    assert chain[2]["source_branch_id"] == branch.id
 
 
 def test_diff_fork_branches_real_chains(env):

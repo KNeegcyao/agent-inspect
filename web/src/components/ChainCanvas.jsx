@@ -6,7 +6,7 @@ const NODE_W = 300
 const NODE_H = 66
 const ROW_GAP = 26
 const DEPTH_STEP = 52
-const PAD = 18
+const PAD = 50
 
 const KIND_COLORS = { llm: '#3b82f6', tool: '#f59e0b', default: '#8b5cf6' }
 

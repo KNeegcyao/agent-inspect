@@ -80,25 +80,23 @@ def run(session) -> None:
         out = graph.invoke({"messages": [{"role": "user", "content": "1 + 2 等于多少?"}]})
     print(f"[demo] 已记录 trace {tid};最终答案: {out['messages'][-1].content}")
 
-    # 2) 从首个决策点(step 0)fork,把 prompt 换成 4+5 → 分支按新 prompt 真实执行
+    # 2) 从 step1(tool 调用)fork,把 add 参数改成 4+5 → 分支按新参数真实执行
     root = session.store.get_trace(tid).root_branch_id
     branch, plan = session.fork.request_fork(
         trace_id=tid,
         from_branch=root,
-        from_step=0,
+        from_step=1,
         modifications=[
-            Modification(step=0, field="input_context.messages[0].content", value="4 + 5 等于多少?")
+            Modification(step=1, field="input_context.x", value=4),
+            Modification(step=1, field="input_context.y", value=5),
         ],
-        note="演示:改 step0 的 prompt 为 4+5",
+        note="演示:从 step1 改 add 参数为 4+5",
     )
     print(f"[demo] 已创建 fork 分支 {branch.id}(起点 step={plan.branch_from_step})")
 
     graph2, _ = make_react_agent(
         [
-            AIMessage(
-                content="",
-                tool_calls=[{"name": "add", "args": {"x": 4, "y": 5}, "id": "c2", "type": "tool_call"}],
-            ),
+            # step0 由前缀回放提供 tool_call;这里只准备 step2(LLM 最终回答)的回复
             AIMessage(content="4 + 5 = 9"),
         ]
     )
