@@ -104,7 +104,7 @@ Once you have two branches (a recorded run + a fork, or two forks), select a **�
 2. Each aligned step gets a status: **same** (shared prefix or identical), **diff** (diverged), **only-left / only-right** (exists on one side only) — color-coded on the chain.
 3. Click a divergent step: the inspector shows the **field-level diff** — every changed input/output field with its left-vs-right value; fields present on only one side are marked **增/删** rather than silently ignored.
 4. A summary chip above the compare column totals the four statuses.
-5. **采纳差异为 Fork**: with a divergent compare branch selected, hit the button above the comparison to preview every diff as a list of **Fork modifications** (input leaves are adopted as `input_context.<path>`, outputs as a whole-`output` override, taken from the right branch). Confirm to create a Fork of the left branch that carries those changes and re-executes from the earliest adopted step.
+5. **采纳差异为 Fork**: with a divergent compare branch selected, hit the button above the comparison to preview every diff as a list of **Fork modifications** (input leaves are adopted as `input_context.<path>`, outputs as a whole-`output` override, taken from the right branch). Confirm to create a Fork of the left branch that carries those changes and re-executes from the earliest adopted step. The compare branch may live in a **different trace**: the preview labels both sides' owning trace, warns when they differ, and the new Fork is always created on the left (main) branch's trace.
 
 ```bash
 python examples/react_agent_demo.py            # records a run + a fork → pick both branches → read the diff

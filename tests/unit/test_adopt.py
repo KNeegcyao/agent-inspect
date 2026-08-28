@@ -218,3 +218,52 @@ def test_preview_adopt_filtered_steps(env):
     )
     steps = {m["step"] for m in result["modifications"]}
     assert steps == {1}  # step2(Y vs c)未被采纳
+
+
+def test_preview_adopt_cross_trace_source_annotation(env):
+    """跨 trace 采纳预览:来源标注 + 值取自另一 trace(spec adopt-cross-trace 跨 trace 采纳预览标注来源)。"""
+    from agent_inspect._context import reset_cursor, set_cursor
+    from tests.conftest import FakeLLM, run_agent
+
+    # 两次独立运行 → 两个不同 trace(无活跃游标时自动新建)
+    run_agent(env.interceptor, 3, FakeLLM(["a", "b", "c"]))
+    token = set_cursor(None)  # 清空游标,下一次 run_agent 新建第二条 trace
+    try:
+        run_agent(env.interceptor, 3, FakeLLM(["X", "Y", "Z"]))
+    finally:
+        reset_cursor(token)
+    traces = env.store.list_traces()
+    assert len(traces) == 2
+    # list_traces 按 started_at DESC(最新在前);按 root 首步输出显式区分 A(a)/B(X),不依赖索引
+    root_a = root_b = trace_a = trace_b = None
+    for t in traces:
+        root = env.store.list_branches(t.id)[0]
+        first = env.store.get_decision_points(t.id, root.id)[0].output["content"]
+        if first == "a":
+            trace_a, root_a = t, root
+        elif first == "X":
+            trace_b, root_b = t, root
+    assert root_a is not None and root_b is not None
+    assert trace_a.id != trace_b.id
+
+    result = preview_adopt(
+        env.store,
+        env.recorder.serializer,
+        env.recorder.context_snap,
+        root_a.id,  # 主分支: trace A
+        root_b.id,  # 对比分支: trace B(另一 trace)
+        from_step=0,
+    )
+    # 两侧 trace 归属标注
+    assert result["branch_a"] == root_a.id and result["branch_b"] == root_b.id
+    assert result["trace_id_a"] != result["trace_id_b"]
+    assert result["trace_a"] and result["trace_b"]
+    # 只读:未创建新分支
+    assert len(env.store.list_branches(trace_a.id)) == 1
+    assert len(env.store.list_branches(trace_b.id)) == 1
+    # 修改值取自 trace B 的记录值(整段 output 覆盖)
+    assert result["modifications"] == [
+        {"step": 0, "field": "output", "value": {"content": "X"}},
+        {"step": 1, "field": "output", "value": {"content": "Y"}},
+        {"step": 2, "field": "output", "value": {"content": "Z"}},
+    ]

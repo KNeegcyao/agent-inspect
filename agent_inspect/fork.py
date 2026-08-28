@@ -69,10 +69,20 @@ class ForkController:
         校验:
         - 空链(该 trace 无任何决策点)拒绝 → spec `fork.空链 Fork`
         - from_step 越界拒绝,避免产生无起点的分支
+        - from_branch 归属校验:父分支必须存在且属于 trace_id,避免跨 trace 错位
+          (采纳跨 trace 值 → 新分支仍创建于主分支所在 trace) → spec `adopt-cross-trace.采纳分支归属校验`
         """
         if self._store.count_decision_points(trace_id) == 0:
             raise ForkError(
                 f"cannot fork empty trace {trace_id}: no decision points recorded yet"
+            )
+        parent = self._store.get_branch(from_branch)
+        if parent is None:
+            raise ForkError(f"cannot fork: branch {from_branch} not found")
+        if parent.trace_id != trace_id:
+            raise ForkError(
+                f"cannot fork: branch {from_branch} belongs to trace {parent.trace_id}, "
+                f"not target trace {trace_id}"
             )
         last = self._store.last_step_before(from_branch, BIG_STEP) or 0
         if from_step < 0 or from_step > last + 1:

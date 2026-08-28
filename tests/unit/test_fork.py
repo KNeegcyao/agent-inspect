@@ -88,6 +88,37 @@ def test_fork_out_of_range_rejected(env):
         env.fork.request_fork(trace_id=trace.id, from_branch=root.id, from_step=99)
 
 
+def test_fork_parent_branch_not_found_rejected(env):
+    """父分支不存在 → 拒绝 + 可观测原因(spec adopt-cross-trace.父分支不存在拒绝)。"""
+    _, _, trace, _root = _record(env, 2, ["a", "b"])
+    with pytest.raises(ForkError) as ei:
+        env.fork.request_fork(trace_id=trace.id, from_branch="does-not-exist", from_step=0)
+    assert "not found" in str(ei.value)
+    assert len(env.store.list_branches(trace.id)) == 1  # 不落库
+
+
+def test_fork_parent_branch_wrong_trace_rejected(env):
+    """父分支属于另一 trace → 拒绝 + 不落库(spec adopt-cross-trace.父分支不属于目标 trace 拒绝)。"""
+    # trace A:记录 a,b,c
+    _, _, trace_a, root_a = _record(env, 3, ["a", "b", "c"])
+    # 清空活跃游标,下一次 run_agent 新建第二条 trace(对称 set/reset,不恢复旧游标)
+    _tok = set_cursor(None)
+    try:
+        # trace B:记录 X,Y,Z(env 单进程共享,新增第二条 trace)
+        _, _, trace_b, root_b = _record(env, 3, ["X", "Y", "Z"])
+    finally:
+        reset_cursor(_tok)
+    assert trace_a.id != trace_b.id
+    # 用 trace A 的 id 发起 fork,但父分支是 trace B 的 root_b → 拒绝
+    with pytest.raises(ForkError) as ei:
+        env.fork.request_fork(trace_id=trace_a.id, from_branch=root_b.id, from_step=0)
+    assert "belongs to trace" in str(ei.value)
+    assert "not target trace" in str(ei.value)
+    # 两个 trace 的分支集合都未被改动
+    assert len(env.store.list_branches(trace_a.id)) == 1
+    assert len(env.store.list_branches(trace_b.id)) == 1
+
+
 def test_nested_fork_replays_parent_branch(env):
     """嵌套 Fork:fork 一个 fork 产物,前缀沿用该分支记录回放(spec fork.嵌套 Fork)。"""
     _, _, trace, root = _record(env, 3, ["a", "b", "c"])

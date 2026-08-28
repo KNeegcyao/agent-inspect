@@ -72,7 +72,9 @@ def preview_adopt(
     """由两分支 diff 计算采纳修改,并校验可发起 Fork(dry_run),返回可执行预览。
 
     只读:不创建分支、不发真实调用。校验空链/起点越界由调用方(request_fork dry_run)兜底。
-    返回 {modifications, branch_a, branch_b, from_step, note, dry_run: True, plan}。
+    返回 {modifications, branch_a, branch_b, from_step, note, dry_run: True, plan,
+          trace_a, trace_b, trace_id_a, trace_id_b}。trace_a / trace_b 为两侧分支所属 trace 的
+    agent_name(退化用 trace_id);trace_id_a / trace_id_b 为对应 trace id,供 UI 判定跨 trace。
     """
     from .diff import build_chain, diff_branches
 
@@ -92,4 +94,22 @@ def preview_adopt(
         "from_step": from_step,
         "note": note,
         "dry_run": True,
+        "trace_a": _trace_label(store, branch_a),
+        "trace_b": _trace_label(store, branch_b),
+        "trace_id_a": _trace_id(store, branch_a),
+        "trace_id_b": _trace_id(store, branch_b),
     }
+
+
+def _trace_label(store, branch_id: str) -> str:
+    """分支所属 trace 的 agent_name,缺失时回退 trace_id。"""
+    branch = store.get_branch(branch_id)
+    if branch is None:
+        return ""
+    t = store.get_trace(branch.trace_id)
+    return t.agent_name if t else branch.trace_id
+
+
+def _trace_id(store, branch_id: str) -> str:
+    branch = store.get_branch(branch_id)
+    return branch.trace_id if branch is not None else ""

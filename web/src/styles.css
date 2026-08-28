@@ -845,6 +845,15 @@ body {
   max-height: 120px;
   overflow: auto;
 }
+.adopt-cross-trace {
+  background: #241c08;
+  border: 1px solid var(--fork);
+  border-radius: 8px;
+  padding: 8px 10px;
+  color: var(--fork);
+  font-size: 12px;
+  line-height: 1.5;
+}
 .bp-form select,
 .bp-form input {
   background: #0b1020;

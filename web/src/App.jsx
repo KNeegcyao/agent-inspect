@@ -765,12 +765,27 @@ function AdoptModal({ branchA, branchB, traceData, onClose, onCreated }) {
         <div className="modal-body">
           <div className="kv-row">
             <span>主分支</span>
-            <code>{branchA?.slice(-8)}</code>
+            <code>
+              {preview?.trace_a
+                ? `${preview.trace_a} · ${branchA?.slice(-8)}`
+                : branchA?.slice(-8)}
+            </code>
           </div>
           <div className="kv-row">
             <span>对比分支</span>
-            <code>{branchB?.slice(-8)}</code>
+            <code>
+              {preview?.trace_b
+                ? `${preview.trace_b} · ${branchB?.slice(-8)}`
+                : branchB?.slice(-8)}
+            </code>
           </div>
+          {preview?.trace_id_a &&
+            preview?.trace_id_b &&
+            preview.trace_id_a !== preview.trace_id_b && (
+              <div className="adopt-cross-trace">
+                修改值取自另一条 trace(对比分支 · {preview.trace_b}),将应用到当前 trace 的新分支
+              </div>
+            )}
           {loading ? (
             <div className="empty-hint">正在计算采纳修改…</div>
           ) : err ? (

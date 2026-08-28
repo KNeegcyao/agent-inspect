@@ -489,3 +489,69 @@ def test_adopt_diff_to_fork_e2e(session):
     assert st == 422 and body.get("error")
     st, body = _post(base, f"/api/branches/{root}/diff/{fork_branch}/adopt", {"from_step": "bad"})
     assert st == 422 and body.get("error")
+
+
+def test_adopt_cross_trace_e2e(session):
+    """跨 trace 采纳:另一 trace 的值 → 主 trace 新分支,来源标注 + 归属校验。
+
+    覆盖 spec adopt-cross-trace:跨 trace 采纳预览(来源标注)、只读预览无副作用、
+    确认创建于主 trace、采纳值跨 trace 生效、父分支归属校验。
+    """
+    base = session.url
+    # trace A:a,b,c
+    with session.trace() as tidA:
+        run_agent(session.interceptor, 3, FakeLLM(["a", "b", "c"]))
+    _st, dataA = _get(base, f"/api/traces/{tidA}")
+    rootA = dataA["trace"]["root_branch_id"]
+    # trace B:X,Y,Z
+    with session.trace() as tidB:
+        run_agent(session.interceptor, 3, FakeLLM(["X", "Y", "Z"]))
+    _st, dataB = _get(base, f"/api/traces/{tidB}")
+    rootB = dataB["trace"]["root_branch_id"]
+    assert tidA != tidB
+
+    before = len(_get(base, f"/api/traces/{tidA}")[1]["branches"])
+
+    # ---- 1) 跨 trace 采纳预览:来源标注 + 值取自 trace B ----
+    _st, res = _post(base, f"/api/branches/{rootA}/diff/{rootB}/adopt", {"from_step": 0})
+    assert _st == 200, res
+    assert res["dry_run"] is True
+    assert res["trace_id_a"] != res["trace_id_b"]
+    assert res["trace_a"] and res["trace_b"]
+    assert res["modifications"] == [
+        {"step": 0, "field": "output", "value": {"content": "X"}},
+        {"step": 1, "field": "output", "value": {"content": "Y"}},
+        {"step": 2, "field": "output", "value": {"content": "Z"}},
+    ]
+    # 只读:主 trace 分支集合不变
+    after = len(_get(base, f"/api/traces/{tidA}")[1]["branches"])
+    assert before == after
+
+    # ---- 2) 确认创建:新分支落在主 trace ----
+    _st, created = _post(
+        base,
+        "/api/forks",
+        {
+            "trace_id": tidA,
+            "branch_id": rootA,
+            "from_step": 0,
+            "modifications": res["modifications"],
+            "note": "adopt cross-trace e2e",
+        },
+    )
+    assert _st == 200, created
+    adopted = created["branch"]
+    assert adopted["origin"] == "fork" and adopted["branch_from_step"] == 0
+    assert adopted["trace_id"] == tidA  # 创建于主 trace
+
+    # ---- 3) 执行:采纳值跨 trace 生效,输出覆盖不真调 ----
+    with session.trace():
+        llm = FakeLLM(["ignored"])
+        outs = run_agent(session.interceptor, 3, llm)
+    assert outs == [{"content": "X"}, {"content": "Y"}, {"content": "Z"}]
+    assert llm.calls == 0
+
+    # ---- 4) 归属校验:父分支不属于目标 trace → 422 ----
+    st, body = _post(base, "/api/forks", {"trace_id": tidA, "branch_id": rootB, "from_step": 0})
+    assert st == 422 and body.get("error")
+    assert "belongs to trace" in body["error"]
