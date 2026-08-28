@@ -25,6 +25,9 @@ export const api = {
   getBranchPoints(branchId) {
     return fetch(`/api/branches/${encodeURIComponent(branchId)}/points`).then(parse)
   },
+  listBranchesAll() {
+    return fetch('/api/branches').then(parse)
+  },
   branchDiff(branchA, branchB) {
     return fetch(
       `/api/branches/${encodeURIComponent(branchA)}/diff/${encodeURIComponent(branchB)}`

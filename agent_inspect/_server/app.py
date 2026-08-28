@@ -117,26 +117,46 @@ def create_app(session) -> FastAPI:
         session.finish_trace(trace_id, lc)
         return {"ok": True, "trace_id": trace_id, "lifecycle": lc}
 
+    @app.get("/api/branches")
+    def list_branches_all():
+        """全局分支索引:所有 trace 的分支并附带所属 trace 标签,供跨 trace 对比分组。"""
+        out = []
+        for t in session.store.list_traces():
+            for b in session.store.list_branches(t.id):
+                d = b.to_dict()
+                d["trace_id"] = t.id
+                d["trace_name"] = t.agent_name or t.id
+                d["trace_lifecycle"] = t.lifecycle
+                out.append(d)
+        return out
+
     @app.get("/api/branches/{branch_id}/points")
     def branch_points_route(branch_id: str):
         return _branch_points(branch_id)
 
     @app.get("/api/branches/{branch_a}/diff/{branch_b}")
     def branch_diff_route(branch_a: str, branch_b: str):
-        """两分支完整链路 diff:对齐步骤(same/diff/only_left/only_right)+ 字段级明细 + 汇总。"""
+        """两分支完整链路 diff:对齐步骤(same/diff/only_left/only_right)+ 字段级明细 + 汇总。
+
+        允许跨 trace:两条不同运行的记录也按 step_index 对齐比较(spec 跨 trace 对比)。
+        """
         ba = session.store.get_branch(branch_a)
         bb = session.store.get_branch(branch_b)
         if ba is None or bb is None:
             return JSONResponse({"error": "branch not found"}, status_code=404)
-        if ba.trace_id != bb.trace_id:
-            return JSONResponse({"error": "branches belong to different traces"}, status_code=422)
-        return diff_branches(
+        result = diff_branches(
             session.store,
             session.recorder.serializer,
             session.recorder.context_snap,
             branch_a,
             branch_b,
         )
+        # 附带左右表达来源,供 UI 跨 trace 标注归属
+        ta = session.store.get_trace(ba.trace_id)
+        tb = session.store.get_trace(bb.trace_id)
+        result["trace_a"] = ta.agent_name if ta else ba.trace_id
+        result["trace_b"] = tb.agent_name if tb else bb.trace_id
+        return result
 
     # ---- fork ----
     @app.post("/api/forks")

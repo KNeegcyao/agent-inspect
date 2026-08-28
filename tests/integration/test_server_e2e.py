@@ -340,10 +340,11 @@ def test_live_debug_mode_c_e2e(session):
 
 
 def test_branch_diff_api_e2e(session):
-    """分支 diff 接口:对齐步骤 + 字段级明细 + 汇总;分支缺失 404 / 跨 trace 422。
+    """分支 diff 接口:对齐步骤 + 字段级明细 + 汇总;分支缺失 404 / 跨 trace 支持。
 
     覆盖 spec branch-diff:分支步骤对齐与状态(共享前缀相同 / 分叉差异)、
-    字段级差异明细(输出字段左右取值)、差异汇总(四类计数)、只读接口错误路径。
+    字段级差异明细(输出字段左右取值)、差异汇总(四类计数)、只读接口错误路径,
+    以及 compare-traces spec:跨 trace 对比与来源标注。
     """
     base = session.url
     # 记录 root 分支:a,b,c
@@ -375,12 +376,35 @@ def test_branch_diff_api_e2e(session):
     field = next(f for f in step1["fields"] if f["path"] == "output.content")
     assert field["left"] == "X" and field["right"] == "Z" and field["status"] == "changed"
 
-    # ---- 错误路径:分支缺失 404;跨 trace 422 ----
+    # ---- 错误路径:分支缺失 404 ----
     st, body = _get_error(base, "/api/branches/does-not-exist/diff/does-not-exist")
     assert st == 404 and body.get("error")
     with session.trace() as tid2:
         run_agent(session.interceptor, 1, FakeLLM(["x"]))
     _st, data2 = _get(base, f"/api/traces/{tid2}")
     root2 = data2["trace"]["root_branch_id"]
-    st, body = _get_error(base, f"/api/branches/{root}/diff/{root2}")
-    assert st == 422
+    # ---- 跨 trace 对比(spec compare-traces):不再 422,返回对齐步骤 + 来源标注 ----
+    _st, xt = _get(base, f"/api/branches/{root}/diff/{root2}")
+    assert _st == 200
+    # 三 vs 一步骤:右 trace 仅 step0(3 步 vs 1 步前两段只在左)
+    statuses = [s["status"] for s in xt["steps"]]
+    assert statuses[0] == "diff", statuses  # step0 内容不同
+    assert statuses[1] == "only_left" and statuses[2] == "only_left", statuses
+    assert xt["summary"] == {"same": 0, "diff": 1, "only_left": 2, "only_right": 0}
+    # 来源标注:两侧 trace 的 agent_name
+    assert xt["trace_a"] and xt["trace_b"]
+    assert len(xt["steps"]) == 3
+
+    # ---- 全局分支索引(spec compare-traces):所有 trace 分支 + 所属 trace 标签 ----
+    _st, allb = _get(base, "/api/branches")
+    assert _st == 200
+    by_id = {b["id"]: b for b in allb}
+    # 两侧 trace 的分支都在索引内,且带 trace 标签
+    assert root in by_id and root2 in by_id
+    assert {root, root2}.issubset({b["id"] for b in allb})
+    labels = {b["trace_name"] for b in allb}
+    assert all(b.get("trace_id") for b in allb)
+    # 分支 id 全索引唯一(可作为下拉选项键)
+    ids = [b["id"] for b in allb]
+    assert len(ids) == len(set(ids))
+    assert labels  # 至少含一个 trace 名

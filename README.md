@@ -100,13 +100,14 @@ Live debugging shares the same interceptor as Record/Replay/Fork — no second e
 
 Once you have two branches (a recorded run + a fork, or two forks), select a **对比分支** in the panel and the two decision chains render side by side, aligned by step:
 
-1. Pick a **主分支** and a **对比分支** in the toolbar.
+1. Pick a **主分支** and a **对比分支** in the toolbar. The compare picker groups every branch **by trace**, so you can compare branches from two separate runs (**cross-trace**) — each side is labeled with its owning trace's agent name.
 2. Each aligned step gets a status: **same** (shared prefix or identical), **diff** (diverged), **only-left / only-right** (exists on one side only) — color-coded on the chain.
 3. Click a divergent step: the inspector shows the **field-level diff** — every changed input/output field with its left-vs-right value; fields present on only one side are marked **增/删** rather than silently ignored.
 4. A summary chip above the compare column totals the four statuses.
 
 ```bash
-python examples/react_agent_demo.py   # records a run + a fork → pick both branches → read the diff
+python examples/react_agent_demo.py            # records a run + a fork → pick both branches → read the diff
+python examples/react_agent_compare_traces.py  # records two runs (different prompts) → compare cross-trace
 ```
 
 The diff is a **read-only** computation over the stored branches — no re-execution, no writes, no schema change.

@@ -54,6 +54,8 @@ export default function BranchDiffView({
   onSelect,
   activeBranchId,
   compareBranchId,
+  traceA,
+  traceB,
 }) {
   const leftByStep = useMemo(() => {
     const m = {}
@@ -73,8 +75,14 @@ export default function BranchDiffView({
     <div className="branch-diff-view">
       <div className="diff-view-header">
         <span>步骤</span>
-        <span>主分支 · {activeBranchId?.slice(-8)}</span>
-        <span>对比分支 · {compareBranchId?.slice(-8)}</span>
+        <span>
+          主分支 · {traceA || activeBranchId?.slice(-8)}
+          {traceA ? <em className="diff-head-tag">{activeBranchId?.slice(-8)}</em> : null}
+        </span>
+        <span>
+          对比分支 · {traceB || compareBranchId?.slice(-8)}
+          {traceB ? <em className="diff-head-tag">{compareBranchId?.slice(-8)}</em> : null}
+        </span>
         <span>状态</span>
       </div>
       {steps.map((s) => {

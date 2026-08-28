@@ -103,3 +103,32 @@
 
 - **WHEN** 用户点击一个 diff 步骤
 - **THEN** 右侧面板显示该步骤 input_context + output 的字段级 diff
+
+### Requirement: 跨 trace 对比
+
+系统 SHALL 允许对两条来自不同 trace 的分支执行并排 diff,并按 step_index 对齐其决策点。
+
+#### Scenario: 不同 trace 可对比
+
+- **WHEN** 用户选择两条分别属于不同 trace 的分支进行对比
+- **THEN** 系统返回对齐后的步骤列表(含 same/diff/only_left/only_right)与字段级明细,不因 trace 不同而拒绝
+
+#### Scenario: 仅一侧存在步骤
+
+- **WHEN** 两条 trace 的步骤数不同
+- **THEN** 多余步骤标记为 only_left / only_right,另一侧显示空白占位
+
+#### Scenario: 不同 trace 共享前缀不被误判
+
+- **WHEN** 两条 trace 的步骤来源互不相同
+- **THEN** 即使步骤输出看起来相同,也不因"来源分支相同"而短路;完全按内容比较
+
+#### Scenario: 对比选择按 trace 分组
+
+- **WHEN** 用户在 UI 选择对比分支
+- **THEN** 候选分支按所属 trace 分组展示,并标注每个 trace 的 agent_name
+
+#### Scenario: 视图标注两侧来源
+
+- **WHEN** 跨 trace 对比结果展示时
+- **THEN** 视图像主导航标题中标注左右两侧各自的 trace 归属

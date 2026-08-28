@@ -226,6 +226,14 @@ body {
   padding: 1px 8px;
   border-radius: 10px;
 }
+.cmp-trace-tag {
+  font-size: 11px;
+  color: var(--accent-2);
+  white-space: nowrap;
+}
+.cmp-trace-tag:empty {
+  display: none;
+}
 .origin-badge.record {
   color: var(--accent-2);
   border: 1px solid var(--accent);
@@ -593,6 +601,13 @@ body {
   color: var(--muted);
   font-size: 12px;
   padding: 0 6px;
+}
+.diff-head-tag {
+  font-style: normal;
+  color: var(--accent-2);
+  font-size: 11px;
+  margin-left: 4px;
+  opacity: 0.8;
 }
 .diff-step-row {
   display: grid;

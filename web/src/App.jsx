@@ -35,6 +35,28 @@ function OriginBadge({ branch }) {
   )
 }
 
+function shortId(id) {
+  return id ? id.slice(-8) : ''
+}
+
+// 分支索引按所属 trace 分组(跨 trace 对比下拉用)
+function groupByTrace(allBranches, traces) {
+  const nameById = {}
+  for (const t of traces) nameById[t.id] = t.agent_name || t.id
+  const groups = new Map() // trace_id -> {trace_id, trace_name, branches}
+  for (const b of allBranches) {
+    if (!groups.has(b.trace_id)) {
+      groups.set(b.trace_id, {
+        trace_id: b.trace_id,
+        trace_name: b.trace_name || nameById[b.trace_id] || b.trace_id,
+        branches: [],
+      })
+    }
+    groups.get(b.trace_id).branches.push(b)
+  }
+  return [...groups.values()]
+}
+
 export default function App() {
   const [traces, setTraces] = useState([])
   const [lifeFilter, setLifeFilter] = useState('all')
@@ -49,6 +71,7 @@ export default function App() {
   const [pausedPayload, setPausedPayload] = useState(null) // trace.paused 载荷(完整输入)
   const [forkFromStep, setForkFromStep] = useState(null) // "在此 Fork" 定位的起点步骤
   const [diffData, setDiffData] = useState(null) // {steps, summary} | null:分支 diff 结果
+  const [allBranches, setAllBranches] = useState([]) // 全局分支索引(含 trace 标签),供跨 trace 分组
 
   // 供稳定 SSE 回调读取的 ref(避免因依赖变化反复重连)
   const ownPointsRef = useRef(ownPoints)
@@ -65,6 +88,14 @@ export default function App() {
   }, [lifeFilter])
   useEffect(() => {
     loadTraces()
+  }, [loadTraces])
+
+  // 全局分支索引(跨 trace 分组对比用)。trace 列表变化时重取。
+  useEffect(() => {
+    api
+      .listBranchesAll()
+      .then(setAllBranches)
+      .catch(() => {})
   }, [loadTraces])
 
   // ---- 选中 trace ----
@@ -101,9 +132,17 @@ export default function App() {
 
   const branchesById = useMemo(() => {
     const m = {}
+    // 全局分支优先作为单一事实源(覆盖跨 trace 对比时其它 trace 的分支)
+    for (const b of allBranches) m[b.id] = b
+    // 当前 trace 的分支兜底补充(例如 SSE 实时新增但全局索引尚未刷新的分支)
     for (const b of traceData?.branches || []) m[b.id] = b
     return m
-  }, [traceData])
+  }, [traceData, allBranches])
+
+  const groupedBranches = useMemo(
+    () => groupByTrace(allBranches, traces),
+    [allBranches, traces]
+  )
 
   // ---- 实时 SSE:追加决策点 / 刷新活跃 trace / 刷新列表 / 调试状态 ----
   useEffect(() => {
@@ -305,15 +344,24 @@ export default function App() {
                   onChange={(e) => setCompareBranchId(e.target.value || null)}
                 >
                   <option value="">(无)</option>
-                  {traceData.branches
-                    .filter((b) => b.id !== activeBranchId)
-                    .map((b) => (
-                      <option key={b.id} value={b.id}>
-                        {originLabel(b.origin)} · 自步骤 {b.branch_from_step} ·{' '}
-                        {b.id.slice(-8)}
-                      </option>
-                    ))}
+                  {groupedBranches.map((g) => (
+                    <optgroup key={g.trace_id} label={g.label}>
+                      {g.branches
+                        .filter((b) => b.id !== activeBranchId)
+                        .map((b) => (
+                          <option key={b.id} value={b.id}>
+                            {g.trace_id === traceData.trace.id ? '本trace' : shortId(g.trace_id)} · {originLabel(b.origin)} · 自步骤 {b.branch_from_step} ·{' '}
+                            {shortId(b.id)}
+                          </option>
+                        ))}
+                    </optgroup>
+                  ))}
                 </select>
+                {compareBranchId && (
+                  <span className="cmp-trace-tag">
+                    对比 · {diffData?.trace_b ? diffData.trace_b : shortId(compareBranchId)}
+                  </span>
+                )}
               </div>
               <div className="toolbar-note">
                 {activeBranch?.note && <span>备注:{activeBranch.note}</span>}
@@ -347,6 +395,8 @@ export default function App() {
                   onSelect={(_stepIndex, pointId) => setSelectedId(pointId)}
                   activeBranchId={activeBranchId}
                   compareBranchId={compareBranchId}
+                  traceA={diffData?.trace_a}
+                  traceB={diffData?.trace_b}
                 />
               ) : (
                 <div className="canvas-col">
