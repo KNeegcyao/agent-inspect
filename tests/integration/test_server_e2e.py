@@ -408,3 +408,84 @@ def test_branch_diff_api_e2e(session):
     ids = [b["id"] for b in allb]
     assert len(ids) == len(set(ids))
     assert labels  # 至少含一个 trace 名
+
+
+def test_adopt_diff_to_fork_e2e(session):
+    """采纳差异:只读预览映射修改清单 → 确认创建 Fork → 采纳后的修改在分支上生效。
+
+    覆盖 spec adopt-diff-to-fork:生成采纳修改(输入/输出映射)、只读预览不创建分支、
+    预览 → 确认 → 复用 /api/forks 创建、错误路径(404/422)。
+    """
+    base = session.url
+    # 记录 root 分支:a,b,c
+    with session.trace() as tid:
+        run_agent(session.interceptor, 3, FakeLLM(["a", "b", "c"]))
+    _st, data = _get(base, f"/api/traces/{tid}")
+    root = data["trace"]["root_branch_id"]
+
+    # 对比分支:从 step1 分叉,后缀真调 X,Y(step0 前缀回放 a)
+    _st, f1 = _post(base, "/api/forks", {"trace_id": tid, "branch_id": root, "from_step": 1})
+    assert _st == 200, f1
+    fork_branch = f1["branch"]["id"]
+    with session.trace():
+        run_agent(session.interceptor, 3, FakeLLM(["X", "Y"]))
+
+    before = len(_get(base, f"/api/traces/{tid}")[1]["branches"])
+
+    # ---- 1) 只读预览:差异 → 修改清单,不创建分支 ----
+    _st, res = _post(
+        base,
+        f"/api/branches/{root}/diff/{fork_branch}/adopt",
+        {"from_step": 1},
+    )
+    assert _st == 200, res
+    assert res["dry_run"] is True
+    assert res["branch_a"] == root and res["branch_b"] == fork_branch
+    # step1(b vs X)与 step2(c vs Y)各一条 output 整段覆盖,值取右侧完整输出
+    assert res["modifications"] == [
+        {"step": 1, "field": "output", "value": {"content": "X"}},
+        {"step": 2, "field": "output", "value": {"content": "Y"}},
+    ]
+    # 只读:分支集合不变
+    after = len(_get(base, f"/api/traces/{tid}")[1]["branches"])
+    assert before == after
+
+    # ---- 2) steps 过滤:只采纳指定步骤 ----
+    _st, filtered = _post(
+        base,
+        f"/api/branches/{root}/diff/{fork_branch}/adopt",
+        {"from_step": 1, "steps": [1]},
+    )
+    assert _st == 200, filtered
+    assert [m["step"] for m in filtered["modifications"]] == [1]
+
+    # ---- 3) 确认创建 Fork:复用 /api/forks,采纳的修改在分支上生效 ----
+    _st, created = _post(
+        base,
+        "/api/forks",
+        {
+            "trace_id": tid,
+            "branch_id": root,
+            "from_step": 1,
+            "modifications": res["modifications"],
+            "note": "adopt e2e",
+        },
+    )
+    assert _st == 200, created
+    adopted = created["branch"]
+    assert adopted["origin"] == "fork" and adopted["branch_from_step"] == 1
+
+    # 执行采纳分支:step0 前缀回放 a;step1/2 注入完整 output 覆盖 X/Y,不真调
+    with session.trace():
+        llm = FakeLLM(["ignored"])
+        outs = run_agent(session.interceptor, 3, llm)
+    assert outs == ["a", {"content": "X"}, {"content": "Y"}]
+    assert llm.calls == 0  # 采纳的 output 覆盖均不真调
+
+    # ---- 4) 错误路径 ----
+    st, body = _post(base, "/api/branches/does-not-exist/diff/x/adopt", {"from_step": 0})
+    assert st == 404 and body.get("error")
+    st, body = _post(base, f"/api/branches/{root}/diff/{fork_branch}/adopt", {"from_step": 999})
+    assert st == 422 and body.get("error")
+    st, body = _post(base, f"/api/branches/{root}/diff/{fork_branch}/adopt", {"from_step": "bad"})
+    assert st == 422 and body.get("error")

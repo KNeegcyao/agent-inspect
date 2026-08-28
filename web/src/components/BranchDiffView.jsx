@@ -56,6 +56,7 @@ export default function BranchDiffView({
   compareBranchId,
   traceA,
   traceB,
+  onAdopt,
 }) {
   const leftByStep = useMemo(() => {
     const m = {}
@@ -70,9 +71,20 @@ export default function BranchDiffView({
   }, [compareChain])
 
   const steps = diffData?.steps || []
+  const diffCount = steps.filter((s) => s.status === 'diff').length
 
   return (
     <div className="branch-diff-view">
+      <div className="diff-actions">
+        <button
+          className="adopt-btn"
+          disabled={diffCount === 0}
+          onClick={onAdopt}
+          title="把对比分支(右)的差异采纳为主分支的 Fork 修改"
+        >
+          采纳差异为 Fork{diffCount > 0 ? ` (${diffCount} 处)` : ''}
+        </button>
+      </div>
       <div className="diff-view-header">
         <span>步骤</span>
         <span>

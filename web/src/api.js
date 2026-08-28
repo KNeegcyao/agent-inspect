@@ -33,6 +33,16 @@ export const api = {
       `/api/branches/${encodeURIComponent(branchA)}/diff/${encodeURIComponent(branchB)}`
     ).then(parse)
   },
+  adoptDiff(branchA, branchB, payload) {
+    return fetch(
+      `/api/branches/${encodeURIComponent(branchA)}/diff/${encodeURIComponent(branchB)}/adopt`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      }
+    ).then(parse)
+  },
   createFork(payload) {
     return fetch('/api/forks', {
       method: 'POST',

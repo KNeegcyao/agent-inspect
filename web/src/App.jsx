@@ -72,6 +72,7 @@ export default function App() {
   const [forkFromStep, setForkFromStep] = useState(null) // "在此 Fork" 定位的起点步骤
   const [diffData, setDiffData] = useState(null) // {steps, summary} | null:分支 diff 结果
   const [allBranches, setAllBranches] = useState([]) // 全局分支索引(含 trace 标签),供跨 trace 分组
+  const [adoptOpen, setAdoptOpen] = useState(false) // 采纳差异弹层
 
   // 供稳定 SSE 回调读取的 ref(避免因依赖变化反复重连)
   const ownPointsRef = useRef(ownPoints)
@@ -111,6 +112,7 @@ export default function App() {
       setDebugState(null)
       setPausedPayload(null)
       setDiffData(null)
+      setAdoptOpen(false)
       api.debugState(id).then(setDebugState).catch(() => {})
       const root = data.trace.root_branch_id
       const hasRoot = root && data.branches.some((b) => b.id === root)
@@ -260,6 +262,12 @@ export default function App() {
     [debugCmd]
   )
 
+  // 打开采纳差异弹层(主/对比分支均选中时可用)
+  const openAdopt = useCallback(() => {
+    if (!activeBranchId || !compareBranchId) return
+    setAdoptOpen(true)
+  }, [activeBranchId, compareBranchId])
+
   // 暂停点高亮:优先实时载荷,其次轮询状态
   const pausedStep =
     pausedPayload?.step_index ?? debugState?.paused_at ?? null
@@ -397,6 +405,7 @@ export default function App() {
                   compareBranchId={compareBranchId}
                   traceA={diffData?.trace_a}
                   traceB={diffData?.trace_b}
+                  onAdopt={openAdopt}
                 />
               ) : (
                 <div className="canvas-col">
@@ -456,6 +465,20 @@ export default function App() {
           />
         )}
       </aside>
+
+      {adoptOpen && (
+        <AdoptModal
+          branchA={activeBranchId}
+          branchB={compareBranchId}
+          traceData={traceData}
+          onClose={() => setAdoptOpen(false)}
+          onCreated={(branch) => {
+            api.getTrace(traceData.trace.id).then(setTraceData).catch(() => {})
+            setActiveBranchId(branch.id)
+            setAdoptOpen(false)
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -673,6 +696,128 @@ function ForkPanel({ traceData, branchId, defaultStep, onCreated }) {
         {busy ? '创建中…' : '创建 Fork 分支'}
       </button>
     </section>
+  )
+}
+
+// ---- 采纳差异弹层:只读预览修改清单,确认后复用 createFork ----
+function AdoptModal({ branchA, branchB, traceData, onClose, onCreated }) {
+  const [loading, setLoading] = useState(true)
+  const [preview, setPreview] = useState(null) // {modifications, branch_a, branch_b, ...}
+  const [fromStep, setFromStep] = useState(0)
+  const [note, setNote] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState(null)
+
+  // 挂载时只读预览:把 diff 差异映射为修改清单,不创建分支
+  useEffect(() => {
+    let cancel = false
+    setLoading(true)
+    setErr(null)
+    api
+      .adoptDiff(branchA, branchB, { from_step: 0 })
+      .then((d) => {
+        if (cancel) return
+        setPreview(d)
+        const steps = (d.modifications || []).map((m) => m.step)
+        if (steps.length) setFromStep(Math.min(...steps))
+      })
+      .catch((e) => {
+        if (!cancel) setErr(e.message)
+      })
+      .finally(() => {
+        if (!cancel) setLoading(false)
+      })
+    return () => {
+      cancel = true
+    }
+  }, [branchA, branchB])
+
+  const mods = preview?.modifications || []
+
+  const confirm = async () => {
+    setErr(null)
+    setBusy(true)
+    try {
+      const res = await api.createFork({
+        trace_id: traceData.trace.id,
+        branch_id: branchA,
+        from_step: parseInt(fromStep, 10),
+        modifications: mods,
+        note: note || undefined,
+      })
+      onCreated(res.branch)
+    } catch (e) {
+      setErr(e.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="modal-mask" onClick={onClose}>
+      <div className="modal adopt-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <h3>采纳差异为 Fork</h3>
+          <button className="ghost-btn small" onClick={onClose} title="关闭">
+            ×
+          </button>
+        </div>
+        <div className="modal-body">
+          <div className="kv-row">
+            <span>主分支</span>
+            <code>{branchA?.slice(-8)}</code>
+          </div>
+          <div className="kv-row">
+            <span>对比分支</span>
+            <code>{branchB?.slice(-8)}</code>
+          </div>
+          {loading ? (
+            <div className="empty-hint">正在计算采纳修改…</div>
+          ) : err ? (
+            <div className="err-block">{err}</div>
+          ) : mods.length === 0 ? (
+            <div className="empty-hint">对比分支无可用差异可采纳</div>
+          ) : (
+            <>
+              <div className="adopt-list">
+                {mods.map((m, i) => (
+                  <div key={i} className="adopt-item">
+                    <span className="adopt-step">#{m.step}</span>
+                    <code className="adopt-field">{m.field}</code>
+                    <pre className="adopt-value">{JSON.stringify(m.value, null, 2)}</pre>
+                  </div>
+                ))}
+              </div>
+              <label className="field">
+                <span>分支起点步骤(该步骤起真实执行,修改均位于其后)</span>
+                <input
+                  type="number"
+                  min="0"
+                  value={fromStep}
+                  onChange={(e) => setFromStep(e.target.value)}
+                />
+              </label>
+              <label className="field">
+                <span>备注(可选)</span>
+                <input value={note} onChange={(e) => setNote(e.target.value)} />
+              </label>
+            </>
+          )}
+        </div>
+        <div className="modal-foot">
+          <button className="ghost-btn" onClick={onClose}>
+            取消
+          </button>
+          <button
+            className="fork-btn"
+            disabled={busy || loading || !!err || mods.length === 0}
+            onClick={confirm}
+          >
+            {busy ? '创建中…' : '确认创建 Fork'}
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
 

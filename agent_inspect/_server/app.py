@@ -17,6 +17,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Streamin
 from fastapi.staticfiles import StaticFiles
 
 from .. import _models as m
+from ..adopt import preview_adopt
 from ..diff import diff_branches
 from ..fork import Modification
 
@@ -156,6 +157,53 @@ def create_app(session) -> FastAPI:
         tb = session.store.get_trace(bb.trace_id)
         result["trace_a"] = ta.agent_name if ta else ba.trace_id
         result["trace_b"] = tb.agent_name if tb else bb.trace_id
+        return result
+
+    @app.post("/api/branches/{branch_a}/diff/{branch_b}/adopt")
+    async def branch_diff_adopt_route(branch_a: str, branch_b: str, request: Request):
+        """把 diff 差异采纳为对 branch_a 的 Fork 修改(只读预览)。
+
+        校验:分支缺失 404;空链/起点越界 422(与 fork.request_fork 一致)。
+        只读:仅计算修改列表,不创建分支、不发真实调用;确认后由 /api/forks 创建。
+        """
+        ba = session.store.get_branch(branch_a)
+        bb = session.store.get_branch(branch_b)
+        if ba is None or bb is None:
+            return JSONResponse({"error": "branch not found"}, status_code=404)
+        body = await request.json()
+        try:
+            from_step = int(body.get("from_step", 0))
+        except (TypeError, ValueError):
+            return JSONResponse({"error": "from_step must be an int"}, status_code=422)
+        steps = body.get("steps")
+        if steps is not None:
+            try:
+                steps = [int(x) for x in steps]
+            except (TypeError, ValueError):
+                return JSONResponse({"error": "steps must be a list of ints"}, status_code=422)
+        note = body.get("note")
+        # 与 fork.request_fork 相同的校验,预览不落库
+        if session.store.count_decision_points(ba.trace_id) == 0:
+            return JSONResponse(
+                {"error": f"cannot adopt onto empty trace {ba.trace_id}: no decision points recorded yet"},
+                status_code=422,
+            )
+        last = session.store.last_step_before(branch_a, 2**31 - 1) or 0
+        if from_step < 0 or from_step > last + 1:
+            return JSONResponse(
+                {"error": f"adopt step {from_step} out of range for branch {branch_a} (0..{last + 1})"},
+                status_code=422,
+            )
+        result = preview_adopt(
+            session.store,
+            session.recorder.serializer,
+            session.recorder.context_snap,
+            branch_a,
+            branch_b,
+            from_step,
+            steps=steps,
+            note=note,
+        )
         return result
 
     # ---- fork ----
