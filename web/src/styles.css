@@ -475,6 +475,55 @@ body {
   padding: 4px 0;
 }
 
+/* ---- Fork 副作用沙箱:策略选择 + 决策点沙箱标记 ---- */
+.sandbox-field {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px;
+  margin-bottom: 12px;
+}
+.radio-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.radio-opt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text);
+  cursor: pointer;
+}
+.radio-opt input {
+  width: auto;
+  margin: 0;
+}
+.radio-opt small {
+  color: var(--muted);
+  font-size: 11px;
+}
+.radio-opt.checked {
+  color: var(--fork);
+}
+.sandbox-mark {
+  margin-top: 10px;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.sandbox-mark.dry-run {
+  background: #241c08;
+  border: 1px solid var(--fork);
+  color: var(--fork);
+}
+.sandbox-mark.blocked {
+  background: #2a1420;
+  border: 1px solid var(--danger);
+  color: var(--danger);
+}
+
 .empty-state {
   display: flex;
   flex-direction: column;

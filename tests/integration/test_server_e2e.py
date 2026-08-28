@@ -555,3 +555,59 @@ def test_adopt_cross_trace_e2e(session):
     st, body = _post(base, "/api/forks", {"trace_id": tidA, "branch_id": rootB, "from_step": 0})
     assert st == 422 and body.get("error")
     assert "belongs to trace" in body["error"]
+
+
+def test_fork_sandbox_e2e(session):
+    """带沙箱的 Fork 全链路:工具 dry-run 无真调 + meta 标记、LLM 照常真调、非法配置 422。
+
+    覆盖 spec fork.副作用沙箱:按 kind 配置策略 / 工具 dry-run 模拟 / 未配置保持真调 / 非法配置拒绝。
+    """
+    base = session.url
+    with session.trace() as tid:
+        run_agent(session.interceptor, 2, FakeLLM(["a", "b"]))
+    _st, data = _get(base, f"/api/traces/{tid}")
+    root = data["trace"]["root_branch_id"]
+
+    # ---- 1) 带 sandbox 发起 Fork ----
+    st, res = _post(
+        base,
+        "/api/forks",
+        {
+            "trace_id": tid,
+            "branch_id": root,
+            "from_step": 0,
+            "sandbox": {"tool": "dry-run"},
+            "note": "sandbox e2e",
+        },
+    )
+    assert st == 200, res
+    fork_branch = res["branch"]
+    assert fork_branch["origin"] == "fork"
+
+    # ---- 2) 执行:工具 dry-run 不真调,LLM 照常真调 ----
+    with session.trace():
+        tool_llm = FakeLLM(["X", "Y"])
+        outs_tool = run_agent(session.interceptor, 2, tool_llm, kind="tool")
+        llm_llm = FakeLLM(["Z"])
+        outs_llm = run_agent(session.interceptor, 1, llm_llm, kind="llm")
+    assert outs_tool == [None, None]
+    assert tool_llm.calls == 0  # 工具被沙箱拦下,无真实调用
+    assert outs_llm == ["Z"]
+    assert llm_llm.calls == 1  # LLM 未配置 → 照常真调
+
+    # ---- 3) 决策点经 API 读取沙箱标记 ----
+    _st, fpts = _get(base, f"/api/branches/{fork_branch['id']}/points")
+    assert [p["kind"] for p in fpts] == ["tool", "tool", "llm"]
+    assert all(p["meta"].get("sandbox") == "dry-run" for p in fpts if p["kind"] == "tool")
+    assert all("sandbox" not in p["meta"] for p in fpts if p["kind"] == "llm")
+
+    # ---- 4) 非法 sandbox 配置 → 422,不落库 ----
+    st, body = _post(
+        base,
+        "/api/forks",
+        {"trace_id": tid, "branch_id": root, "from_step": 0, "sandbox": {"tool": "bogus"}},
+    )
+    assert st == 422 and body.get("error")
+    assert "invalid sandbox policy" in body["error"]
+    branches = _get(base, f"/api/traces/{tid}")[1]["branches"]
+    assert {b["id"] for b in branches} == {root, fork_branch["id"]}  # 未新增分支

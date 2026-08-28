@@ -53,6 +53,7 @@ class Interceptor:
                 replay_branch_id=plan.origin_branch,
                 branch_from_step=plan.branch_from_step,
                 dry_run=plan.dry_run,
+                sandbox=plan.sandbox,
             )
             cursor.last_dp_id = self._prefix_last_dp(plan.trace_id, plan.origin_branch, plan.branch_from_step)
             self._mark_live(cursor)
@@ -211,6 +212,10 @@ class Interceptor:
                     call = make_modified_call(dp.input_context)
             if cursor.dry_run:
                 return reconstruct(None), True  # 只读预览:不真调
+            policy = self._sandbox_policy(cursor, dp)
+            if policy is not None:
+                dp.meta["sandbox"] = policy  # "dry-run" | "blocked":沙箱拦截不真调
+                return reconstruct(None), True
             return call(), True
         # record
         return call(), True
@@ -239,6 +244,10 @@ class Interceptor:
                     call = make_modified_call(dp.input_context)
             if cursor.dry_run:
                 return reconstruct(None), True
+            policy = self._sandbox_policy(cursor, dp)
+            if policy is not None:
+                dp.meta["sandbox"] = policy  # "dry-run" | "blocked":沙箱拦截不真调
+                return reconstruct(None), True
             out = call()
             return (await out) if _is_awaitable(out) else out, True
         out = call()
@@ -260,6 +269,22 @@ class Interceptor:
         if self.controller is None:
             return None
         return self.controller.modification_for(cursor.branch_id, step)
+
+    @staticmethod
+    def _sandbox_policy(cursor, dp) -> Optional[str]:
+        """沙箱闸门:命中 dry-run/block 返回待落盘标记,否则 None(照常真调)。
+
+        只作用于"将要真调"的 fork 后缀决策点;未配置的 kind 视为 allow。
+        """
+        sb = cursor.sandbox
+        if not sb:
+            return None
+        p = sb.get(dp.kind)
+        if p == "dry-run":
+            return "dry-run"
+        if p == "block":
+            return "blocked"
+        return None
 
     @staticmethod
     def _apply_input_mod(dp, mod) -> None:

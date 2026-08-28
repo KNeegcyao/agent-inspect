@@ -27,6 +27,7 @@ class ExecutionCursor:
         "replay_cursor",
         "branch_from_step",
         "dry_run",
+        "sandbox",
         "live_debug",
         "last_dp_id",
         "_step_index",
@@ -43,6 +44,7 @@ class ExecutionCursor:
         replay_cursor: int = 0,
         branch_from_step: int = 0,
         dry_run: bool = False,
+        sandbox: Optional[dict] = None,
         live_debug: bool = False,
     ) -> None:
         self.trace_id = trace_id
@@ -53,6 +55,8 @@ class ExecutionCursor:
         self.replay_cursor = replay_cursor
         self.branch_from_step = branch_from_step
         self.dry_run = dry_run
+        # Fork 副作用沙箱:按决策点 kind 配置的策略 {kind: allow|dry-run|block}
+        self.sandbox = sandbox
         # Mode C:live 调试标记(决策点边界咨询调试门;record/replay/fork 之上正交)
         self.live_debug = live_debug
         self.last_dp_id: Optional[str] = None

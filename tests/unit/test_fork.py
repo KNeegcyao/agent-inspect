@@ -21,13 +21,14 @@ def _record(env, n: int, scripted: list):
     return llm, outs, trace, root
 
 
-def _fork_cursor(env, trace, root, from_step, mods=None, dry_run=False):
+def _fork_cursor(env, trace, root, from_step, mods=None, dry_run=False, sandbox=None):
     branch, plan = env.fork.request_fork(
         trace_id=trace.id,
         from_branch=root.id,
         from_step=from_step,
         modifications=mods,
         dry_run=dry_run,
+        sandbox=sandbox,
     )
     cursor = ExecutionCursor(
         trace_id=trace.id,
@@ -36,6 +37,7 @@ def _fork_cursor(env, trace, root, from_step, mods=None, dry_run=False):
         replay_branch_id=root.id,
         branch_from_step=plan.branch_from_step,
         dry_run=dry_run,
+        sandbox=plan.sandbox,
     )
     return cursor, branch
 
@@ -238,3 +240,73 @@ def test_concurrent_branch_writes_safe(env):
     p2 = env.store.get_decision_points(trace.id, b2.id)
     assert [x.output for x in p1] == [{"content": "X"}]
     assert [x.output for x in p2] == [{"content": "Y"}]
+
+
+# ---- Fork 副作用沙箱(spec `fork.副作用沙箱`)----
+
+
+def test_fork_sandbox_tool_dry_run(env):
+    """工具 dry-run:不真调 + meta.sandbox=dry-run;LLM 未配置照常真调(spec fork.副作用沙箱.工具 dry-run 模拟)。"""
+    _, _, trace, root = _record(env, 2, ["a", "b"])
+    cursor, _b = _fork_cursor(env, trace, root, 0, sandbox={"tool": "dry-run"})
+    _enter(cursor)
+    tool_llm = FakeLLM(["X", "Y"])
+    outs_tool = run_agent(env.interceptor, 2, tool_llm, kind="tool")
+    llm_llm = FakeLLM(["Z"])
+    outs_llm = run_agent(env.interceptor, 1, llm_llm, kind="llm")
+    _exit()
+    # 工具:不真调,输出为空(与只读预览档同构)
+    assert outs_tool == [None, None]
+    assert tool_llm.calls == 0
+    # LLM:未配置 kind → 照常真调
+    assert outs_llm == ["Z"]
+    assert llm_llm.calls == 1
+    # 落盘 meta.sandbox:仅工具决策点带标记
+    dps = env.store.get_decision_points(trace.id, _b.id)
+    tool_dps = [d for d in dps if d.kind == "tool"]
+    llm_dps = [d for d in dps if d.kind == "llm"]
+    assert len(tool_dps) == 2
+    assert all(d.meta.get("sandbox") == "dry-run" for d in tool_dps)
+    assert all("sandbox" not in d.meta for d in llm_dps)
+
+
+def test_fork_sandbox_tool_block(env):
+    """工具 block:不真调 + meta.sandbox=blocked(spec fork.副作用沙箱.工具 block 阻止)。"""
+    _, _, trace, root = _record(env, 2, ["a", "b"])
+    cursor, _b = _fork_cursor(env, trace, root, 0, sandbox={"tool": "block"})
+    _enter(cursor)
+    tool_llm = FakeLLM(["X"])
+    outs = run_agent(env.interceptor, 1, tool_llm, kind="tool")
+    _exit()
+    assert outs == [None]
+    assert tool_llm.calls == 0
+    dps = env.store.get_decision_points(trace.id, _b.id)
+    assert dps[0].meta.get("sandbox") == "blocked"
+
+
+def test_fork_sandbox_default_and_allow_real_call(env):
+    """未配置 sandbox 或显式 allow:照常真调,行为与无沙箱一致(spec fork.副作用沙箱.未配置保持真调)。"""
+    _, _, trace, root = _record(env, 2, ["a", "b"])
+    for sb in (None, {"tool": "allow"}):
+        cursor, _b = _fork_cursor(env, trace, root, 0, sandbox=sb)
+        _enter(cursor)
+        llm = FakeLLM(["X"])
+        outs = run_agent(env.interceptor, 1, llm, kind="tool")
+        _exit()
+        assert outs == ["X"]
+        assert llm.calls == 1
+        dps = env.store.get_decision_points(trace.id, _b.id)
+        assert "sandbox" not in dps[0].meta
+
+
+def test_fork_sandbox_invalid_rejected(env):
+    """非法 kind / policy → ForkError 拒绝 + 不落库(spec fork.副作用沙箱.非法配置拒绝)。"""
+    _, _, trace, root = _record(env, 2, ["a", "b"])
+    with pytest.raises(ForkError) as ei:
+        env.fork.request_fork(trace_id=trace.id, from_branch=root.id, from_step=0, sandbox={"llm": "nope"})
+    assert "invalid sandbox policy" in str(ei.value)
+    with pytest.raises(ForkError) as ei:
+        env.fork.request_fork(trace_id=trace.id, from_branch=root.id, from_step=0, sandbox={"memory": "block"})
+    assert "invalid sandbox kind" in str(ei.value)
+    # 两种非法配置都不落库
+    assert len(env.store.list_branches(trace.id)) == 1

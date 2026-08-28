@@ -54,6 +54,8 @@ That's it. No server to deploy. No database to configure. Interception is **zero
 
 **What you'll see:** a single-page panel rendering this run's decision chain — *think → tool → result* — as a tree. Click any decision point to read its full prompt. Hit **Fork**, change a prompt or a tool result, and the Agent re-executes the steps *after* your change while replaying the prefix for free (no real LLM calls on the prefix). Watch the two branches diverge, side by side.
 
+When you create a Fork you can also pick a **工具调用副作用策略** for the live suffix: `allow` (real tool calls, default), `dry-run` (the tool decision point records as *模拟执行(沙箱)* and never really runs), or `block` (records as *被沙箱阻止*). This isolates real side effects while you experiment — LLM calls still run, so you can see how the agent *would* respond, without the tool actually firing.
+
 **Run it offline right now** (no API key needed — ships with a scripted chat model):
 
 ```bash
@@ -129,12 +131,12 @@ The diff is a **read-only** computation over the stored branches — no re-execu
 **In the MVP:**
 - Python-only SDK; auto-instruments **LangChain** and the **OpenAI** SDK.
 - Replay (read-only) + **Counterfactual Fork** (the flagship).
+- **Fork side-effect sandbox**: per-kind policies (`allow` / `dry-run` / `block`) isolate tool side effects on the live suffix.
 - **Live (Mode C)**: attach to a running agent, conditional breakpoints, pause / step / continue, edit an input at a paused point.
 - One-line launch with a local panel; local file storage; zero external backend.
 - Single-page React UI: decision tree, full-prompt inspection, fork interaction, branch diff (side-by-side, field-level), live debug toolbar.
 
 **Deliberately out (follow-up changes):**
-- Fork side-effect sandbox. Phase 2 (for now: real execution is explicit, + a `dry_run` preview).
 - TS / Go SDKs; framework auto-instrumentation beyond LangChain/OpenAI.
 - VSCode / JetBrains plugins; built-in eval engine; ClickHouse; WASM large-graph rendering; multi-Agent cross-process tracing.
 

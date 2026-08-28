@@ -531,6 +531,13 @@ function PointDetails({ point, onFork }) {
         <span>共享前缀</span>
         <code>{point.inherited ? '是' : '否'}</code>
       </div>
+      {point.meta?.sandbox && (
+        <div className={`sandbox-mark ${point.meta.sandbox}`}>
+          {point.meta.sandbox === 'dry-run'
+            ? '模拟执行(沙箱):未发起真实调用'
+            : '被沙箱阻止:未发起真实调用'}
+        </div>
+      )}
       <JsonBlock label="输入" data={point.input_context} />
       <JsonBlock label="输出" data={point.output} />
       {point.meta?.error && (
@@ -558,6 +565,7 @@ function ForkPanel({ traceData, branchId, defaultStep, onCreated }) {
   const [fromStep, setFromStep] = useState(defaultStep ?? 0)
   const [mods, setMods] = useState([]) // {key, step, field, valueText}
   const [note, setNote] = useState('')
+  const [sandbox, setSandbox] = useState('allow') // 工具调用副作用策略
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState(null)
 
@@ -601,17 +609,20 @@ function ForkPanel({ traceData, branchId, defaultStep, onCreated }) {
     }
     setBusy(true)
     try {
-      const res = await api.createFork({
+      const payload = {
         trace_id: traceData.trace.id,
         branch_id: branchId,
         from_step: parseInt(fromStep, 10),
         modifications: parsed,
         note: note || undefined,
-      })
+      }
+      if (sandbox !== 'allow') payload.sandbox = { tool: sandbox }
+      const res = await api.createFork(payload)
       onCreated(res.branch)
       setOpen(false)
       setMods([])
       setNote('')
+      setSandbox('allow')
     } catch (e) {
       setErr(e.message)
     } finally {
@@ -684,6 +695,29 @@ function ForkPanel({ traceData, branchId, defaultStep, onCreated }) {
           + 添加修改
         </button>
       </div>
+
+      <fieldset className="field sandbox-field">
+        <span>工具调用副作用策略(对 Fork 后缀的真实工具调用生效)</span>
+        <div className="radio-row">
+          {[
+            ['allow', '放行', '工具照常真实调用'],
+            ['dry-run', '模拟执行', '不真调,输出为空并标记模拟'],
+            ['block', '阻止', '不真调并标记阻止'],
+          ].map(([val, label, tip]) => (
+            <label key={val} className={`radio-opt ${sandbox === val ? 'checked' : ''}`}>
+              <input
+                type="radio"
+                name="sandbox"
+                value={val}
+                checked={sandbox === val}
+                onChange={() => setSandbox(val)}
+              />
+              <span>{label}</span>
+              <small>{tip}</small>
+            </label>
+          ))}
+        </div>
+      </fieldset>
 
       <label className="field">
         <span>备注(可选)</span>

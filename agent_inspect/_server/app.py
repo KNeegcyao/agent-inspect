@@ -222,6 +222,7 @@ def create_app(session) -> FastAPI:
                 modifications=mods,
                 dry_run=bool(body.get("dry_run", False)),
                 note=body.get("note"),
+                sandbox=body.get("sandbox"),
             )
         except Exception as e:  # noqa: BLE001 - 校验失败以可观测原因返回
             return JSONResponse({"error": str(e)}, status_code=422)

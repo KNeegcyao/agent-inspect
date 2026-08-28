@@ -18,9 +18,13 @@ from . import _models as m
 
 BIG_STEP = 2**31
 
+# Fork 副作用沙箱:按决策点 kind 配置执行策略(spec `fork.副作用沙箱`)
+SANDBOX_KINDS = (m.KIND_LLM, m.KIND_TOOL)  # "llm", "tool"
+SANDBOX_POLICIES = ("allow", "dry-run", "block")
+
 
 class ForkError(Exception):
-    """Fork 发起校验失败(空链 / 越界起点)。"""
+    """Fork 发起校验失败(空链 / 越界起点 / 非法沙箱配置)。"""
 
 
 @dataclass
@@ -30,6 +34,7 @@ class ForkPlan:
     origin_branch: str
     branch_from_step: int
     dry_run: bool = False
+    sandbox: Optional[dict] = None
 
 
 @dataclass
@@ -63,6 +68,7 @@ class ForkController:
         modifications: Optional[list[Modification]] = None,
         dry_run: bool = False,
         note: Optional[str] = None,
+        sandbox: Optional[dict] = None,
     ) -> tuple[m.Branch, ForkPlan]:
         """从已记录决策点发起新分支。前缀 0..from_step-1 回放,后缀 from_step 起真调。
 
@@ -71,7 +77,15 @@ class ForkController:
         - from_step 越界拒绝,避免产生无起点的分支
         - from_branch 归属校验:父分支必须存在且属于 trace_id,避免跨 trace 错位
           (采纳跨 trace 值 → 新分支仍创建于主分支所在 trace) → spec `adopt-cross-trace.采纳分支归属校验`
+        - sandbox 校验:kind 与 policy 均须合法,否则拒绝且不落库
+          (副作用沙箱按决策点类型配置) → spec `fork.副作用沙箱.非法配置拒绝`
         """
+        if sandbox:
+            for kind, policy in sandbox.items():
+                if kind not in SANDBOX_KINDS:
+                    raise ForkError(f"invalid sandbox kind: {kind!r}")
+                if policy not in SANDBOX_POLICIES:
+                    raise ForkError(f"invalid sandbox policy {policy!r} for kind {kind!r}")
         if self._store.count_decision_points(trace_id) == 0:
             raise ForkError(
                 f"cannot fork empty trace {trace_id}: no decision points recorded yet"
@@ -103,6 +117,7 @@ class ForkController:
             origin_branch=from_branch,
             branch_from_step=from_step,
             dry_run=dry_run,
+            sandbox=sandbox,
         )
         with self._lock:
             self._pending.append(plan)
