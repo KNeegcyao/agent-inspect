@@ -65,6 +65,7 @@ class Session:
             record_mode=record_mode,
             blob_threshold=blob_threshold,
             on_event=self.events.publish,
+            parent_trace_id=os.environ.get("AGENT_INSPECT_PARENT_TRACE"),
         )
         self.fork = ForkController(self.store)
         self.debug = DebugController(self.store, on_event=self.events.publish)

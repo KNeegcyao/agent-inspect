@@ -60,6 +60,8 @@
 - **WHEN** Agent 执行中存在分支或并行决策
 - **THEN** 决策点之间的因果关系被记录,链路视图可据此重建分支与并行结构
 
+## ADDED Requirements
+
 ### Requirement: 跨进程 trace 父子关联
 系统 SHALL 允许一条 trace 声明其父 trace,使不同进程的记录可按父子关联还原为一次跨进程任务。
 

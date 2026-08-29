@@ -117,6 +117,33 @@ The diff is a **read-only** computation over the stored branches — no re-execu
 
 ---
 
+## Cross-process tracing: tie a child run to its parent
+
+A recorded trace is per-process today. When one Agent **spawns another process** (a worker, a sub-agent CLI, a cron), its decisions land in a separate trace with no link back to the one that started it. Cross-process tracing closes that gap with a single environment variable:
+
+1. The parent process records its trace as usual (trace `P`).
+2. When it spawns a child, it passes `AGENT_INSPECT_PARENT_TRACE=P` in the child's environment (same database file).
+3. The child's `agent_inspect.start()` reads that variable, so its newly-created trace `C` is stored with `parent_trace_id=P`.
+4. In the panel, `C` appears **indented** with a **「跨进程」** badge; opening `P` shows **子 trace × N**, and opening `C` shows a clickable **父 trace · P** chip.
+
+```python
+import agent_inspect
+
+agent_inspect.start()   # parent: records trace P
+
+# …when spawning a worker…
+env = {**os.environ, "AGENT_INSPECT_PARENT_TRACE": P}
+subprocess.run([python, "worker.py"], env=env)   # worker records trace C, parent=P
+```
+
+No env var set → behavior is identical to before (`parent_trace_id` is `None`). The core record path is untouched; only the new trace carries the parent link. Run it offline:
+
+```bash
+python examples/react_agent_cross_process.py   # 父进程记录 → 派生子进程(带 env)→ 子 trace 挂到父 trace 下
+```
+
+---
+
 ## Core ideas
 
 1. **A decision is a unit.** Every LLM call and every tool call is recorded as a *decision point* — full prompt in, full response out, with latency and tokens.
@@ -133,12 +160,13 @@ The diff is a **read-only** computation over the stored branches — no re-execu
 - Replay (read-only) + **Counterfactual Fork** (the flagship).
 - **Fork side-effect sandbox**: per-kind policies (`allow` / `dry-run` / `block`) isolate tool side effects on the live suffix.
 - **Live (Mode C)**: attach to a running agent, conditional breakpoints, pause / step / continue, edit an input at a paused point.
+- **Cross-process tracing**: a child process that declares `AGENT_INSPECT_PARENT_TRACE` links its trace to the parent's — indented + **「跨进程」** badge in the panel.
 - One-line launch with a local panel; local file storage; zero external backend.
 - Single-page React UI: decision tree, full-prompt inspection, fork interaction, branch diff (side-by-side, field-level), live debug toolbar.
 
 **Deliberately out (follow-up changes):**
 - TS / Go SDKs; framework auto-instrumentation beyond LangChain/OpenAI.
-- VSCode / JetBrains plugins; built-in eval engine; ClickHouse; WASM large-graph rendering; multi-Agent cross-process tracing.
+- VSCode / JetBrains plugins; built-in eval engine; ClickHouse; WASM large-graph rendering.
 
 We'd rather ship a debugger that does *one thing* superbly than a platform that does *everything* adequately.
 
@@ -180,7 +208,7 @@ Spec is source of truth; prose docs explain *why* the spec says what it says.
 
 ## Status
 
-Pre-alpha / **MVP implemented, tested and archived**. The MVP (`add-agent-inspect-mvp`): one-line `agent_inspect.start()`, LangChain + OpenAI auto-instrumentation, Replay + Counterfactual Fork, local SQLite storage, single-page React panel. **Live debugging (Mode C)** (`add-live-debug-mode-c`): attach to a running agent, conditional breakpoints, pause / step / continue, edit input at a paused point. **Branch diff** (`add-branch-diff`): side-by-side compare of two branches with per-step status and field-level diff detail. **65 tests green** (unit + integration + e2e), `openspec validate --all` passes, specs merged into baseline. UI rendering is verified in-browser. See [tasks](openspec/changes/archive/2026-08-27-add-branch-diff/tasks.md).
+Pre-alpha / **MVP implemented, tested and archived**. The MVP (`add-agent-inspect-mvp`): one-line `agent_inspect.start()`, LangChain + OpenAI auto-instrumentation, Replay + Counterfactual Fork, local SQLite storage, single-page React panel. **Live debugging (Mode C)** (`add-live-debug-mode-c`): attach to a running agent, conditional breakpoints, pause / step / continue, edit input at a paused point. **Branch diff** (`add-branch-diff`): side-by-side compare of two branches with per-step status and field-level diff detail. **Fork side-effect sandbox** (`2026-08-28-fork-side-effect-sandbox`): per-kind policies isolate tool side effects on the live suffix. **Cross-process tracing** (`2026-08-28-cross-process-trace`): a child process declaring `AGENT_INSPECT_PARENT_TRACE` links its trace to the parent's. **93 tests green** (unit + integration + e2e), `openspec validate --all` passes, specs merged into baseline. UI rendering is verified in-browser.
 
 ## License
 

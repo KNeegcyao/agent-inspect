@@ -12,7 +12,8 @@ CREATE TABLE IF NOT EXISTS traces (
     started_at REAL NOT NULL,
     agent_name TEXT NOT NULL,
     root_branch_id TEXT,
-    lifecycle TEXT NOT NULL
+    lifecycle TEXT NOT NULL,
+    parent_trace_id TEXT
 );
 
 CREATE TABLE IF NOT EXISTS branches (
@@ -77,5 +78,13 @@ def connect(path: str) -> sqlite3.Connection:
     conn.execute("PRAGMA journal_mode=WAL;")
     conn.execute("PRAGMA synchronous=NORMAL;")
     conn.executescript(_SCHEMA)
+    _migrate(conn)
     conn.commit()
     return conn
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    """幂等迁移:既有库缺列则补列(老行默认为 NULL)。"""
+    cols = {row[1] for row in conn.execute("PRAGMA table_info(traces)").fetchall()}
+    if "parent_trace_id" not in cols:
+        conn.execute("ALTER TABLE traces ADD COLUMN parent_trace_id TEXT")

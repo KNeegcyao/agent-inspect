@@ -4,6 +4,8 @@
 """
 from __future__ import annotations
 
+from typing import Optional
+
 from .serializer import Serializer
 from .dedup import Dedup
 from .context_snap import ContextSnap
@@ -25,6 +27,7 @@ class Recorder:
         record_mode: str = "dev",
         blob_threshold: int = 4096,
         on_event=None,
+        parent_trace_id: Optional[str] = None,
     ) -> None:
         self.store = store
         self.record_mode = record_mode
@@ -32,10 +35,11 @@ class Recorder:
         self.dedup = Dedup(threshold=blob_threshold)
         self.context_snap = ContextSnap()
         self.on_event = on_event  # callback(event_name, payload) 供 SSE 推送
+        self.parent_trace_id = parent_trace_id  # 跨进程父 trace(id),无则 None
 
     # ---- trace / branch ----
     def create_trace_and_root(self, agent_name: str = "agent"):
-        return self.store.create_trace_with_root(agent_name)
+        return self.store.create_trace_with_root(agent_name, parent_trace_id=self.parent_trace_id)
 
     # ---- persist ----
     def persist(self, dp) -> None:

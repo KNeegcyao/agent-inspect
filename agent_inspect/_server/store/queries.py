@@ -22,7 +22,9 @@ class Store:
             self._conn.close()
 
     # ---- traces ----
-    def create_trace_with_root(self, agent_name: str) -> tuple[m.Trace, m.Branch]:
+    def create_trace_with_root(
+        self, agent_name: str, parent_trace_id: Optional[str] = None
+    ) -> tuple[m.Trace, m.Branch]:
         """创建一条新 trace 及其根分支(record 基线)。先落分支再落 trace,避免外键悬空。"""
         trace = m.Trace(
             id=m.new_id("tr"),
@@ -30,6 +32,7 @@ class Store:
             agent_name=agent_name,
             root_branch_id=None,
             lifecycle=m.LIFECYCLE_RUNNING,
+            parent_trace_id=parent_trace_id,
         )
         branch = m.Branch(
             id=m.new_id("br"),
@@ -46,27 +49,30 @@ class Store:
                 (branch.id, branch.trace_id, branch.parent_branch_id, branch.branch_from_step, branch.origin, branch.note),
             )
             self._conn.execute(
-                "INSERT INTO traces(id, started_at, agent_name, root_branch_id, lifecycle) "
-                "VALUES(?,?,?,?,?)",
-                (trace.id, trace.started_at, trace.agent_name, branch.id, trace.lifecycle),
+                "INSERT INTO traces(id, started_at, agent_name, root_branch_id, lifecycle, parent_trace_id) "
+                "VALUES(?,?,?,?,?,?)",
+                (trace.id, trace.started_at, trace.agent_name, branch.id, trace.lifecycle, trace.parent_trace_id),
             )
             self._conn.commit()
         trace.root_branch_id = branch.id
         return trace, branch
 
-    def create_trace(self, agent_name: str, root_branch_id: str) -> m.Trace:
+    def create_trace(
+        self, agent_name: str, root_branch_id: str, parent_trace_id: Optional[str] = None
+    ) -> m.Trace:
         t = m.Trace(
             id=m.new_id("tr"),
             started_at=m.now(),
             agent_name=agent_name,
             root_branch_id=root_branch_id,
             lifecycle=m.LIFECYCLE_RUNNING,
+            parent_trace_id=parent_trace_id,
         )
         with self._lock:
             self._conn.execute(
-                "INSERT INTO traces(id, started_at, agent_name, root_branch_id, lifecycle) "
-                "VALUES(?,?,?,?,?)",
-                (t.id, t.started_at, t.agent_name, t.root_branch_id, t.lifecycle),
+                "INSERT INTO traces(id, started_at, agent_name, root_branch_id, lifecycle, parent_trace_id) "
+                "VALUES(?,?,?,?,?,?)",
+                (t.id, t.started_at, t.agent_name, t.root_branch_id, t.lifecycle, t.parent_trace_id),
             )
             self._conn.commit()
         return t
@@ -81,7 +87,8 @@ class Store:
     def get_trace(self, trace_id: str) -> Optional[m.Trace]:
         with self._lock:
             row = self._conn.execute(
-                "SELECT id, started_at, agent_name, root_branch_id, lifecycle FROM traces WHERE id=?",
+                "SELECT id, started_at, agent_name, root_branch_id, lifecycle, parent_trace_id "
+                "FROM traces WHERE id=?",
                 (trace_id,),
             ).fetchone()
         if row is None:
@@ -92,10 +99,11 @@ class Store:
             agent_name=row[2],
             root_branch_id=row[3],
             lifecycle=row[4],
+            parent_trace_id=row[5],
         )
 
     def list_traces(self, lifecycle: Optional[str] = None) -> list[m.Trace]:
-        q = "SELECT id, started_at, agent_name, root_branch_id, lifecycle FROM traces"
+        q = "SELECT id, started_at, agent_name, root_branch_id, lifecycle, parent_trace_id FROM traces"
         args: tuple = ()
         if lifecycle is not None:
             q += " WHERE lifecycle=?"
@@ -104,7 +112,34 @@ class Store:
         with self._lock:
             rows = self._conn.execute(q, args).fetchall()
         return [
-            m.Trace(id=r[0], started_at=r[1], agent_name=r[2], root_branch_id=r[3], lifecycle=r[4])
+            m.Trace(
+                id=r[0],
+                started_at=r[1],
+                agent_name=r[2],
+                root_branch_id=r[3],
+                lifecycle=r[4],
+                parent_trace_id=r[5],
+            )
+            for r in rows
+        ]
+
+    def list_child_traces(self, parent_trace_id: str) -> list[m.Trace]:
+        """返回 parent_trace_id 的直接子 trace(按开始时间升序)。"""
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT id, started_at, agent_name, root_branch_id, lifecycle, parent_trace_id "
+                "FROM traces WHERE parent_trace_id=? ORDER BY started_at",
+                (parent_trace_id,),
+            ).fetchall()
+        return [
+            m.Trace(
+                id=r[0],
+                started_at=r[1],
+                agent_name=r[2],
+                root_branch_id=r[3],
+                lifecycle=r[4],
+                parent_trace_id=r[5],
+            )
             for r in rows
         ]
 

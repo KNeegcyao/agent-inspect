@@ -611,3 +611,65 @@ def test_fork_sandbox_e2e(session):
     assert "invalid sandbox policy" in body["error"]
     branches = _get(base, f"/api/traces/{tid}")[1]["branches"]
     assert {b["id"] for b in branches} == {root, fork_branch["id"]}  # 未新增分支
+
+
+def test_cross_process_trace_e2e(session, tmp_path):
+    """跨进程追踪:子进程带 env 记录 → 父 trace 的 children 含子 trace。
+
+    覆盖 spec cross-process-trace:子进程通过 AGENT_INSPECT_PARENT_TRACE 声明父 trace,
+    新记录 trace 落库携带 parent_trace_id,`GET /api/traces/{parent}` 的 children 含子 trace。
+    """
+    import os
+    import subprocess
+    import sys
+    import textwrap
+
+    base = session.url
+    db_path = str(tmp_path / "e2e.db")
+    root_dir = str(Path(__file__).resolve().parents[2])
+
+    with session.trace() as tid:
+        run_agent(session.interceptor, 1, FakeLLM(["parent"]))
+
+    child_code = textwrap.dedent(
+        f"""
+        import sys
+        sys.path.insert(0, {root_dir!r})
+        import agent_inspect
+        from tests.conftest import FakeLLM, run_agent
+        s = agent_inspect.start(db_path={db_path!r}, autostart_browser=False)
+        try:
+            with s.trace() as cid:
+                run_agent(s.interceptor, 1, FakeLLM(["child"]))
+            print("CHILD_TRACE=" + cid)
+        finally:
+            s.stop()
+        """
+    )
+    env = {**os.environ, "AGENT_INSPECT_PARENT_TRACE": tid}
+    proc = subprocess.run(
+        [sys.executable, "-c", child_code],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert proc.returncode == 0, proc.stderr
+    child_id = next(
+        (line.split("=", 1)[1] for line in proc.stdout.splitlines() if line.startswith("CHILD_TRACE=")),
+        None,
+    )
+    assert child_id is not None, proc.stdout
+
+    # 父 trace 的 children 含子 trace;子 trace 自身标记父引用
+    _st, data = _get(base, f"/api/traces/{tid}")
+    assert _st == 200
+    assert data["trace"]["parent_trace_id"] is None
+    assert child_id in {c["id"] for c in data["children"]}
+    _st, cdata = _get(base, f"/api/traces/{child_id}")
+    assert cdata["trace"]["parent_trace_id"] == tid
+    # 列表接口每条带 parent_trace_id(UI 缩进 + 徽标的数据基础)
+    _st, traces = _get(base, "/api/traces")
+    by_id = {t["id"]: t for t in traces}
+    assert by_id[tid]["parent_trace_id"] is None
+    assert by_id[child_id]["parent_trace_id"] == tid

@@ -104,6 +104,7 @@ def create_app(session) -> FastAPI:
         return {
             "trace": t.to_dict(),
             "branches": [b.to_dict() for b in branches],
+            "children": [c.to_dict() for c in session.store.list_child_traces(trace_id)],
         }
 
     @app.post("/api/traces/{trace_id}/lifecycle")
@@ -396,4 +397,5 @@ def trace_payload(session, trace_id: str) -> dict:
     return {
         "trace": t.to_dict(),
         "branches": [b.to_dict() for b in branches],
+        "children": [c.to_dict() for c in session.store.list_child_traces(trace_id)],
     }

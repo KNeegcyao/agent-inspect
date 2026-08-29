@@ -94,6 +94,7 @@ class Trace:
     agent_name: str
     root_branch_id: Optional[str]
     lifecycle: str
+    parent_trace_id: Optional[str] = None  # 跨进程父 trace(id),无则 None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -102,6 +103,7 @@ class Trace:
             "agent_name": self.agent_name,
             "root_branch_id": self.root_branch_id,
             "lifecycle": self.lifecycle,
+            "parent_trace_id": self.parent_trace_id,
         }
 
 

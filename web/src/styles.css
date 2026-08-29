@@ -144,6 +144,23 @@ body {
   margin-top: 4px;
 }
 
+/* 跨进程子 trace:缩进 + 「跨进程」徽标 */
+.trace-child {
+  margin-left: 18px;
+  border-style: dashed;
+  border-color: var(--fork);
+}
+.cross-proc-badge {
+  font-size: 10px;
+  color: var(--fork);
+  border: 1px solid var(--fork);
+  border-radius: 8px;
+  padding: 0 6px;
+  margin-left: auto;
+  margin-right: 6px;
+  white-space: nowrap;
+}
+
 .life {
   font-size: 11px;
   padding: 1px 8px;
@@ -195,6 +212,40 @@ body {
   border-bottom: 1px solid var(--border);
   background: var(--panel);
   flex-wrap: wrap;
+}
+
+/* 跨进程父子引用栏 */
+.trace-rel-bar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  min-height: 18px;
+}
+.trace-rel-bar:empty {
+  display: none;
+}
+.rel-chip {
+  font-size: 11px;
+  color: var(--accent-2);
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  padding: 1px 8px;
+  background: transparent;
+  font-family: var(--mono);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.rel-chip:not(button) {
+  color: var(--fork);
+  border-color: var(--fork);
+  cursor: default;
+}
+.rel-chip:hover {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
 }
 
 .branch-pick {

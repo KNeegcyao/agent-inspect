@@ -299,11 +299,12 @@ export default function App() {
           {traces.map((t) => (
             <button
               key={t.id}
-              className={`trace-item ${t.id === traceData?.trace?.id ? 'trace-active' : ''}`}
+              className={`trace-item ${t.id === traceData?.trace?.id ? 'trace-active' : ''} ${t.parent_trace_id ? 'trace-child' : ''}`}
               onClick={() => selectTrace(t.id)}
             >
               <div className="trace-line">
                 <span className="trace-name">{t.agent_name || t.id}</span>
+                {t.parent_trace_id && <span className="cross-proc-badge">跨进程</span>}
                 <span className={`life life-${t.lifecycle}`}>
                   {lifecycleLabel(t.lifecycle)}
                 </span>
@@ -329,6 +330,22 @@ export default function App() {
           </div>
         ) : (
           <>
+            <div className="trace-rel-bar">
+              {traceData.trace.parent_trace_id && (
+                <button
+                  className="rel-chip"
+                  title={traceData.trace.parent_trace_id}
+                  onClick={() => selectTrace(traceData.trace.parent_trace_id)}
+                >
+                  父 trace · {shortId(traceData.trace.parent_trace_id)}
+                </button>
+              )}
+              {traceData.children?.length > 0 && (
+                <span className="rel-chip" title="直接子 trace 数">
+                  子 trace × {traceData.children.length}
+                </span>
+              )}
+            </div>
             <div className="toolbar">
               <div className="branch-pick">
                 <label>主分支</label>
