@@ -20,12 +20,12 @@
 
 - [x] 4.1 单测:LLM/工具逐字段导出;顺序与父子链;空链;往返等价(导出 → 导入 → kind/顺序/输入输出逐一一致)
 - [x] 4.2 e2e:导出接口(下载头/往返经真实 HTTP/404)
-- [ ] 4.3 全量 pytest 通过(既有能力含导入零回归)
+- [x] 4.3 全量 pytest 通过(既有能力含导入零回归)
 
 ## 5. 验证与发布
 
 - [ ] 5.1 `openspec validate --all` 通过
 - [ ] 5.2 `cd web && npm run build` 通过
-- [ ] 5.3 示例脚本追加「导出 → 再导入」往返演示并跑通
+- [x] 5.3 示例脚本追加「导出 → 再导入」往返演示并跑通
 - [ ] 5.4 README 导入一节扩为「导入导出」;`openspec/specs/README.md` 能力清单随 archive 更新
 - [ ] 5.5 `openspec archive export-openinference-traces --yes`;commit + push

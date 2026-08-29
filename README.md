@@ -144,16 +144,17 @@ python examples/react_agent_cross_process.py   # 父进程记录 → 派生子�
 
 ---
 
-## Import external traces: eat *someone else's* trace and fork it
+## Import & export external traces: eat *someone else's* trace and fork it
 
 The debugger's raw material doesn't have to be a trace *you* recorded. Agent-Inspect imports span-export JSON following the OpenInference semantic conventions — the kind of file an observability platform or a colleague can hand you — and turns it into a first-class trace:
 
 1. In the panel sidebar, hit **导入 trace** and pick a `.json` span export (OTLP JSON envelope or a flat span list; `openinference.span.kind` distinguishes LLM / tool spans).
 2. The imported trace shows up with an **「导入」** badge — same decision-point model as self-recorded traces: full prompt in, output out, cause edges along the span tree.
 3. Fork it, modify a step, and run **your** agent: the prefix replays deterministically from the imported outputs (zero real calls), the suffix really executes — you just ran a counterfactual on a production run you never recorded yourself.
+4. And it goes both ways: the **导出** button on any trace header downloads the same format — hand your chain to a colleague, archive it outside the local DB, or re-import it later. Export → import roundtrips content-identically.
 
 ```bash
-python examples/react_agent_import_trace.py   # 录一段 → 合成 span 导出 → 导入 → 在导入链路上 Fork
+python examples/react_agent_import_trace.py   # 录一段 → 合成 span 导出 → 导入 → 在导入链路上 Fork → 导出再导入
 ```
 
 ---
@@ -175,7 +176,7 @@ python examples/react_agent_import_trace.py   # 录一段 → 合成 span 导出
 - **Fork side-effect sandbox**: per-kind policies (`allow` / `dry-run` / `block`) for both **LLM decision points** and **tool calls** isolate real side effects on the live suffix.
 - **Live (Mode C)**: attach to a running agent, conditional breakpoints, pause / step / continue, edit an input at a paused point.
 - **Cross-process tracing**: a child process that declares `AGENT_INSPECT_PARENT_TRACE` links its trace to the parent's — indented + **「跨进程」** badge in the panel.
-- **External trace import**: import a span-export JSON (OpenInference conventions) as a first-class trace — inspect it and fork it like any self-recorded run.
+- **External trace import/export**: import a span-export JSON (OpenInference conventions) as a first-class trace — inspect it and fork it like any self-recorded run; export any trace back to the same format (roundtrip-equivalent).
 - One-line launch with a local panel; local file storage; zero external backend.
 - Single-page React UI: decision tree, full-prompt inspection, fork interaction, branch diff (side-by-side, field-level), live debug toolbar.
 
@@ -223,7 +224,7 @@ Spec is source of truth; prose docs explain *why* the spec says what it says.
 
 ## Status
 
-Pre-alpha / **MVP implemented, tested and archived**. The MVP (`add-agent-inspect-mvp`): one-line `agent_inspect.start()`, LangChain + OpenAI auto-instrumentation, Replay + Counterfactual Fork, local SQLite storage, single-page React panel. **Live debugging (Mode C)** (`add-live-debug-mode-c`): attach to a running agent, conditional breakpoints, pause / step / continue, edit input at a paused point. **Branch diff** (`add-branch-diff`): side-by-side compare of two branches with per-step status and field-level diff detail. **Fork side-effect sandbox** (`2026-08-28-fork-side-effect-sandbox`): per-kind policies isolate tool side effects on the live suffix. **Cross-process tracing** (`2026-08-28-cross-process-trace`): a child process declaring `AGENT_INSPECT_PARENT_TRACE` links its trace to the parent's. **LLM decision-point sandbox** (`2026-08-29-llm-decision-sandbox`): per-kind sandbox policies now cover LLM decision points too, independent of tool policy. **External trace import** (`import-openinference-traces`): import OpenInference span-export JSON as a first-class, forkable trace. **112 tests green** (unit + integration + e2e), `openspec validate --all` passes, specs merged into baseline. UI rendering is verified in-browser.
+Pre-alpha / **MVP implemented, tested and archived**. The MVP (`add-agent-inspect-mvp`): one-line `agent_inspect.start()`, LangChain + OpenAI auto-instrumentation, Replay + Counterfactual Fork, local SQLite storage, single-page React panel. **Live debugging (Mode C)** (`add-live-debug-mode-c`): attach to a running agent, conditional breakpoints, pause / step / continue, edit input at a paused point. **Branch diff** (`add-branch-diff`): side-by-side compare of two branches with per-step status and field-level diff detail. **Fork side-effect sandbox** (`2026-08-28-fork-side-effect-sandbox`): per-kind policies isolate tool side effects on the live suffix. **Cross-process tracing** (`2026-08-28-cross-process-trace`): a child process declaring `AGENT_INSPECT_PARENT_TRACE` links its trace to the parent's. **LLM decision-point sandbox** (`2026-08-29-llm-decision-sandbox`): per-kind sandbox policies now cover LLM decision points too, independent of tool policy. **External trace import** (`import-openinference-traces`): import OpenInference span-export JSON as a first-class, forkable trace. **External trace export** (`export-openinference-traces`): export any trace to the same format; export → import roundtrips content-identically. **119 tests green** (unit + integration + e2e), `openspec validate --all` passes, specs merged into baseline. UI rendering is verified in-browser.
 
 ## License
 

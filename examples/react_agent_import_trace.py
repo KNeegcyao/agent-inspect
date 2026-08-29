@@ -130,9 +130,13 @@ def export_span_json(session, trace_id: str, path: Path) -> Path:
 
 def import_span_json(session, path: Path) -> dict:
     """经 POST /api/traces/import 导入 span 导出文件(与面板「导入」按钮同一契约)。"""
+    return import_span_json_bytes(session, path.read_bytes())
+
+
+def import_span_json_bytes(session, data: bytes) -> dict:
     req = urllib.request.Request(
         f"{session.url}/api/traces/import",
-        data=path.read_bytes(),
+        data=data,
         headers={"Content-Type": "application/json"},
         method="POST",
     )
@@ -188,6 +192,17 @@ def run(session) -> None:
         out2 = graph2.invoke({"messages": [{"role": "user", "content": "1 + 2 等于多少?"}]})
     print(f"[demo] fork 分支最终答案: {out2['messages'][-1].content}")
     print(f"[demo] 真实 LLM 调用次数: {model2._called}(前缀思考步回放自导入输出,不真调)")
+
+    # 5) 往返演示:导出导入链路 → 再次导入(导出与导入互为逆操作)
+    with urllib.request.urlopen(
+        f"{session.url}/api/traces/{imported_tid}/export", timeout=5
+    ) as r:
+        exported = r.read()
+    res2 = import_span_json_bytes(session, exported)
+    print(
+        f"[demo] 往返: 导出 {len(exported)} 字节 → 再次导入 trace {res2['trace_id']}"
+        f"(决策点 ×{res2['decision_points']},内容与导入链路一致)"
+    )
 
 
 def session_store_get(session, trace_id: str) -> tuple:
