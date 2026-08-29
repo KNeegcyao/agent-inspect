@@ -218,6 +218,69 @@ def test_step_executes_one_point_then_pauses(denv):
     assert th.llm.calls == 3
 
 
+def test_stale_step_command_ignored(denv):
+    """释放指令绑定暂停点:重复/过期 step(at_step) 不误放已前进到的暂停点。
+
+    网络重试会把同一条 step 指令投递两次;若无绑定,第二次会在下一个暂停点
+    立即放行,表现为"单步跳了两步"(回归:live-debug e2e 偶发 paused_at=2)。
+    """
+    trace, root = _start_trace(denv)
+    gate = denv.debug.ensure_gate(trace.id)
+    gate.attach()
+    gate.pause()
+    th = _AgentThread(denv, trace.id, root.id, n=3).start()
+    _wait_paused(gate, 0)
+    gate.step(at_step=0)
+    _wait_paused(gate, 1)
+    gate.step(at_step=0)  # 过期指令(at_step 仍是旧暂停点)→ 忽略
+    time.sleep(0.05)
+    assert gate.state()["paused_at"] == 1
+    gate.step(at_step=1)  # 匹配当前暂停点 → 放行
+    _wait_paused(gate, 2)
+    gate.step(at_step=1)  # 又一条过期指令 → 忽略
+    time.sleep(0.05)
+    assert gate.state()["paused_at"] == 2
+    gate.resume(at_step=2)
+    assert th.join()
+    assert th.outs == ["s0", "s1", "s2"]
+    assert th.llm.calls == 3
+
+
+def test_step_mismatched_at_step_does_not_release(denv):
+    """at_step 与当前暂停点不匹配 → 指令忽略,agent 原地保持暂停。"""
+    trace, root = _start_trace(denv)
+    gate = denv.debug.ensure_gate(trace.id)
+    gate.attach()
+    gate.pause()
+    th = _AgentThread(denv, trace.id, root.id, n=1).start()
+    _wait_paused(gate, 0)
+    assert gate.step(at_step=99) is False
+    time.sleep(0.05)
+    assert gate.state()["paused_at"] == 0  # 仍暂停在原点
+    gate.resume()
+    assert th.join()
+    assert th.outs == ["s0"]
+
+
+def test_duplicate_modify_does_not_release_next_pause(denv):
+    """modify 放行绑定其目标 step:重复投递的 modify 不误放后续暂停点。"""
+    trace, root = _start_trace(denv)
+    gate = denv.debug.ensure_gate(trace.id)
+    gate.attach()
+    gate.add_breakpoint(kind="llm")  # 每个决策点都命中 → modify 放行后停到 step1
+    gate.pause()
+    th = _AgentThread(denv, trace.id, root.id, n=2).start()
+    _wait_paused(gate, 0)
+    gate.modify(step=0, field="messages[0].content", value="EDITED", action="continue")
+    _wait_paused(gate, 1)  # 放行后断点再次命中
+    gate.modify(step=0, field="messages[0].content", value="EDITED", action="continue")  # 重复投递
+    time.sleep(0.05)
+    assert gate.state()["paused_at"] == 1  # 未被过期 modify 误放
+    gate.resume()
+    assert th.join()
+    assert th.outs == ["s0", "s1"]
+
+
 def test_pause_after_continue_takes_effect_next_point(denv):
     trace, root = _start_trace(denv)
     gate = denv.debug.ensure_gate(trace.id)

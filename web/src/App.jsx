@@ -231,6 +231,10 @@ export default function App() {
 
   const activeBranch = activeBranchId ? branchesById[activeBranchId] : null
 
+  // 暂停点高亮:优先实时载荷,其次轮询状态
+  const pausedStep =
+    pausedPayload?.step_index ?? debugState?.paused_at ?? null
+
   // ---- Mode C 调试指令(统一捕获错误 + 刷新状态)----
   const debugCmd = useCallback(async (fn) => {
     const id = traceDataRef.current?.trace?.id
@@ -244,11 +248,15 @@ export default function App() {
   }, [])
   const onDebugAttach = useCallback(() => debugCmd((id) => api.debugAttach(id)), [debugCmd])
   const onDebugPause = useCallback(() => debugCmd((id) => api.debugPause(id)), [debugCmd])
-  const onDebugStep = useCallback(() => debugCmd((id) => api.debugStep(id)), [debugCmd])
+  // 释放指令携带发起时的暂停点(at_step):重复/迟到投递不再误放后续暂停点
+  const onDebugStep = useCallback(
+    () => debugCmd((id) => api.debugStep(id, pausedStep)),
+    [debugCmd, pausedStep]
+  )
   const onDebugContinue = useCallback(() => {
-    debugCmd((id) => api.debugContinue(id))
+    debugCmd((id) => api.debugContinue(id, pausedStep))
     setPausedPayload(null)
-  }, [debugCmd])
+  }, [debugCmd, pausedStep])
   const onDebugAddBreakpoint = useCallback(
     (payload) => debugCmd((id) => api.debugAddBreakpoint(id, payload)),
     [debugCmd]
@@ -267,10 +275,6 @@ export default function App() {
     if (!activeBranchId || !compareBranchId) return
     setAdoptOpen(true)
   }, [activeBranchId, compareBranchId])
-
-  // 暂停点高亮:优先实时载荷,其次轮询状态
-  const pausedStep =
-    pausedPayload?.step_index ?? debugState?.paused_at ?? null
 
   return (
     <div className="app">

@@ -240,6 +240,16 @@ def create_app(session) -> FastAPI:
             )
         return t, None
 
+    def _optional_at_step(raw: bytes) -> Optional[int]:
+        """释放指令可携带 at_step(发起时的暂停点);缺省/空体 → None(无条件放行)。"""
+        if not raw:
+            return None
+        try:
+            v = json.loads(raw).get("at_step")
+        except Exception:  # noqa: BLE001 - 非法体视同未携带
+            return None
+        return int(v) if v is not None else None
+
     @app.post("/api/debug/{trace_id}/attach")
     async def debug_attach(trace_id: str):
         _t, err = _require_running_trace(trace_id)
@@ -290,20 +300,20 @@ def create_app(session) -> FastAPI:
         return {"ok": True, "action": "pause"}
 
     @app.post("/api/debug/{trace_id}/step")
-    async def debug_step(trace_id: str):
+    async def debug_step(trace_id: str, request: Request):
         _t, err = _require_running_trace(trace_id)
         if err is not None:
             return err
-        session.debug_step(trace_id)
-        return {"ok": True, "action": "step"}
+        released = session.debug_step(trace_id, at_step=_optional_at_step(await request.body()))
+        return {"ok": True, "action": "step", "released": bool(released)}
 
     @app.post("/api/debug/{trace_id}/continue")
-    async def debug_continue(trace_id: str):
+    async def debug_continue(trace_id: str, request: Request):
         _t, err = _require_running_trace(trace_id)
         if err is not None:
             return err
-        session.debug_continue(trace_id)
-        return {"ok": True, "action": "continue"}
+        released = session.debug_continue(trace_id, at_step=_optional_at_step(await request.body()))
+        return {"ok": True, "action": "continue", "released": bool(released)}
 
     @app.post("/api/debug/{trace_id}/modify")
     async def debug_modify(trace_id: str, request: Request):

@@ -171,15 +171,17 @@ class Session:
         if gate is not None:
             gate.pause()
 
-    def debug_step(self, trace_id: str) -> None:
+    def debug_step(self, trace_id: str, at_step: Optional[int] = None) -> bool:
         gate = self.debug.gate(trace_id)
-        if gate is not None:
-            gate.step()
+        if gate is None:
+            return False
+        return gate.step(at_step)
 
-    def debug_continue(self, trace_id: str) -> None:
+    def debug_continue(self, trace_id: str, at_step: Optional[int] = None) -> bool:
         gate = self.debug.gate(trace_id)
-        if gate is not None:
-            gate.resume()
+        if gate is None:
+            return False
+        return gate.resume(at_step)
 
     def debug_modify(self, trace_id: str, step: int, field: str, value) -> None:
         gate = self.debug.gate(trace_id)

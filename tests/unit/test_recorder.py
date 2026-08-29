@@ -101,3 +101,39 @@ def test_cause_edge_persisted(env):
     points = env.store.get_decision_points(trace.id, branch.id)
     assert points[1].cause_edge == [points[0].id]
     assert points[2].cause_edge == [points[1].id]
+
+
+# ---- 同时钟刻度排序确定性(回归:Windows time.time() 精度可达 ~15.6ms)----
+
+
+def test_same_tick_traces_newest_first(monkeypatch, env):
+    """同一时钟刻度创建的多条 trace:list_traces 按插入序破平局,新者在先。"""
+    import agent_inspect._models as m
+
+    monkeypatch.setattr(m, "now", lambda: 1234.0)  # 所有 started_at 完全相等
+    t1, _ = env.store.create_trace_with_root("a")
+    t2, _ = env.store.create_trace_with_root("b")
+    t3, _ = env.store.create_trace_with_root("c")
+    assert [t.id for t in env.store.list_traces()] == [t3.id, t2.id, t1.id]
+
+
+def test_same_tick_child_traces_insertion_order(monkeypatch, env):
+    """同一时钟刻度创建的子 trace:list_child_traces 按插入序破平局。"""
+    import agent_inspect._models as m
+
+    monkeypatch.setattr(m, "now", lambda: 1234.0)
+    parent, _ = env.store.create_trace_with_root("parent")
+    c1, _ = env.store.create_trace_with_root("c1", parent_trace_id=parent.id)
+    c2, _ = env.store.create_trace_with_root("c2", parent_trace_id=parent.id)
+    assert [t.id for t in env.store.list_child_traces(parent.id)] == [c1.id, c2.id]
+
+
+def test_same_tick_breakpoints_insertion_order(monkeypatch, env):
+    """同一时钟刻度创建的断点:list_breakpoints 按插入序破平局。"""
+    import agent_inspect._models as m
+
+    monkeypatch.setattr(m, "now", lambda: 1234.0)
+    trace, _ = env.store.create_trace_with_root("a")
+    bp1 = env.store.add_breakpoint(trace.id, kind="llm")
+    bp2 = env.store.add_breakpoint(trace.id, condition="x")
+    assert [b.id for b in env.store.list_breakpoints(trace.id)] == [bp1.id, bp2.id]

@@ -108,7 +108,8 @@ class Store:
         if lifecycle is not None:
             q += " WHERE lifecycle=?"
             args = (lifecycle,)
-        q += " ORDER BY started_at DESC"
+        # rowid 次级键打破平局:同刻度创建(Windows time.time() 精度可达 ~15.6ms)时顺序仍确定
+        q += " ORDER BY started_at DESC, rowid DESC"
         with self._lock:
             rows = self._conn.execute(q, args).fetchall()
         return [
@@ -128,7 +129,7 @@ class Store:
         with self._lock:
             rows = self._conn.execute(
                 "SELECT id, started_at, agent_name, root_branch_id, lifecycle, parent_trace_id "
-                "FROM traces WHERE parent_trace_id=? ORDER BY started_at",
+                "FROM traces WHERE parent_trace_id=? ORDER BY started_at, rowid",
                 (parent_trace_id,),
             ).fetchall()
         return [
@@ -373,7 +374,7 @@ class Store:
         with self._lock:
             rows = self._conn.execute(
                 "SELECT id, trace_id, kind, agent_id, condition, enabled, created_at "
-                "FROM breakpoints WHERE trace_id=? ORDER BY created_at",
+                "FROM breakpoints WHERE trace_id=? ORDER BY created_at, rowid",
                 (trace_id,),
             ).fetchall()
         return [m.Breakpoint(*r) for r in rows]

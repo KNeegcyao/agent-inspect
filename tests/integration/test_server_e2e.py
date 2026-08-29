@@ -292,9 +292,11 @@ def test_live_debug_mode_c_e2e(session):
         time.sleep(0.02)
     assert tid is not None, "agent trace 未在预期时间内建立"
 
-    # ---- attach ----
-    st, state = _post(base, f"/api/debug/{tid}/attach", {})
-    assert st == 200 and state["attached"] is True
+    # ---- attach(重试安全:以 GET state 为准断言,避免重复投递的 attached=False 干扰)----
+    st, _ = _post(base, f"/api/debug/{tid}/attach", {})
+    assert st == 200
+    _st, state = _get(base, f"/api/debug/{tid}/state")
+    assert state["attached"] is True
 
     # ---- 设断点:kind=llm(首个决策点命中)→ 暂停 step 0 ----
     st, bp = _post(base, f"/api/debug/{tid}/breakpoints", {"kind": "llm"})
@@ -302,9 +304,9 @@ def test_live_debug_mode_c_e2e(session):
     start.set()  # 放行 agent → 首个决策点命中断点暂停
     _wait_debug_paused(base, tid, 0)
 
-    # ---- 单步 → step 1 ----
-    st, _ = _post(base, f"/api/debug/{tid}/step", {})
-    assert st == 200
+    # ---- 单步 → step 1(携带 at_step:重复/迟到投递不会误放新暂停点)----
+    st, res = _post(base, f"/api/debug/{tid}/step", {"at_step": 0})
+    assert st == 200 and res["released"] is True
     _wait_debug_paused(base, tid, 1)
 
     # ---- 改输入并继续:step 1 的 messages[0].content → "EDITED" ----
@@ -315,10 +317,11 @@ def test_live_debug_mode_c_e2e(session):
     )
     assert st == 200 and res["ok"] is True
 
-    # ---- 移除断点后继续放行 → agent 完成 ----
+    # ---- 移除断点后继续放行 → agent 完成(continue 同样绑定暂停点)----
     st, res = _delete(base, f"/api/debug/{tid}/breakpoints/{bp['id']}")
     assert st == 200 and res["ok"] is True
-    st, _ = _post(base, f"/api/debug/{tid}/continue", {})
+    _st, dstate = _get(base, f"/api/debug/{tid}/state")
+    st, _ = _post(base, f"/api/debug/{tid}/continue", {"at_step": dstate.get("paused_at")})
     assert st == 200
     assert done.wait(5), "agent 在 remove+continue 后未完成"
     assert holder["outs"] == ["s0", "s1", "s2", "s3", "s4"]

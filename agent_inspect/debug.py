@@ -152,22 +152,38 @@ class DebugGate:
         with self._lock:
             self.pause_requested = True
 
-    def step(self) -> None:
-        with self._lock:
-            self._release_action = _RELEASE_STEP
-            self._release.set()
+    def step(self, at_step: Optional[int] = None) -> bool:
+        """单步放行。at_step 给定时仅当仍停在该暂停点才放行(重复/过期指令幂等忽略)。"""
+        return self._issue_release(at_step, _RELEASE_STEP)
 
-    def resume(self) -> None:
-        with self._lock:
-            self._release_action = _RELEASE_CONTINUE
-            self._release.set()
+    def resume(self, at_step: Optional[int] = None) -> bool:
+        """继续放行。at_step 语义同 step。"""
+        return self._issue_release(at_step, _RELEASE_CONTINUE)
 
-    def modify(self, step: int, field: str, value: Any, action: str = _RELEASE_CONTINUE) -> None:
-        """替换待执行决策点输入并放行(action ∈ continue / step)。"""
+    def _issue_release(self, at_step: Optional[int], action: str) -> bool:
+        """放行暂停点;返回是否真的放行。
+
+        at_step 绑定暂停代际:指令送达时代码可能已前进(网络重试/迟到指令),
+        不匹配当前暂停点则忽略,避免一次重复投递跳过一个暂停点。
+        """
         with self._lock:
-            self.pending_modify = {"step": step, "field": field, "value": value}
+            if at_step is not None and self.paused_at != at_step:
+                return False
             self._release_action = action
             self._release.set()
+            return True
+
+    def modify(self, step: int, field: str, value: Any, action: str = _RELEASE_CONTINUE) -> None:
+        """替换待执行决策点输入并放行(action ∈ continue / step)。
+
+        放行绑定到修改的目标 step:仅当仍停在该步骤才释放;重复投递的 modify
+        不会误放已前进到的其它暂停点,其修改暂存待该步骤暂停时生效。
+        """
+        with self._lock:
+            self.pending_modify = {"step": step, "field": field, "value": value}
+            if self.paused_at == step:
+                self._release_action = action
+                self._release.set()
 
     # ------------------------------------------------------------------
     # 状态查询

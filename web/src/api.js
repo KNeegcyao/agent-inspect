@@ -77,14 +77,18 @@ export const api = {
       method: 'POST',
     }).then(parse)
   },
-  debugStep(traceId) {
+  debugStep(traceId, atStep) {
     return fetch(`/api/debug/${encodeURIComponent(traceId)}/step`, {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(atStep == null ? {} : { at_step: atStep }),
     }).then(parse)
   },
-  debugContinue(traceId) {
+  debugContinue(traceId, atStep) {
     return fetch(`/api/debug/${encodeURIComponent(traceId)}/continue`, {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(atStep == null ? {} : { at_step: atStep }),
     }).then(parse)
   },
   debugModify(traceId, payload) {
