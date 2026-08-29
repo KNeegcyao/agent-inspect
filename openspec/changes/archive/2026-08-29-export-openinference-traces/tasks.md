@@ -24,8 +24,8 @@
 
 ## 5. 验证与发布
 
-- [ ] 5.1 `openspec validate --all` 通过
-- [ ] 5.2 `cd web && npm run build` 通过
+- [x] 5.1 `openspec validate --all` 通过
+- [x] 5.2 `cd web && npm run build` 通过
 - [x] 5.3 示例脚本追加「导出 → 再导入」往返演示并跑通
-- [ ] 5.4 README 导入一节扩为「导入导出」;`openspec/specs/README.md` 能力清单随 archive 更新
-- [ ] 5.5 `openspec archive export-openinference-traces --yes`;commit + push
+- [x] 5.4 README 导入一节扩为「导入导出」;`openspec/specs/README.md` 能力清单随 archive 更新
+- [x] 5.5 `openspec archive export-openinference-traces --yes`;commit + push
