@@ -310,3 +310,85 @@ def test_fork_sandbox_invalid_rejected(env):
     assert "invalid sandbox kind" in str(ei.value)
     # 两种非法配置都不落库
     assert len(env.store.list_branches(trace.id)) == 1
+
+
+# ---- LLM 决策点沙箱(spec fork.LLM 决策点沙箱)----
+
+
+def test_fork_sandbox_llm_dry_run(env):
+    """LLM dry-run:不真调 + meta.sandbox=dry-run;工具未配置照常真调(spec fork.LLM 决策点沙箱.LLM dry-run 模拟)。"""
+    _, _, trace, root = _record(env, 2, ["a", "b"])
+    cursor, _b = _fork_cursor(env, trace, root, 0, sandbox={"llm": "dry-run"})
+    _enter(cursor)
+    llm = FakeLLM(["X", "Y"])
+    outs_llm = run_agent(env.interceptor, 2, llm)
+    tool_llm = FakeLLM(["Z"])
+    outs_tool = run_agent(env.interceptor, 1, tool_llm, kind="tool")
+    _exit()
+    # LLM:dry-run → 不真调,输出为空
+    assert outs_llm == [None, None]
+    assert llm.calls == 0
+    # 工具:未配置 kind → 照常真调
+    assert outs_tool == ["Z"]
+    assert tool_llm.calls == 1
+    # 落盘 meta.sandbox:仅 LLM 决策点带标记
+    dps = env.store.get_decision_points(trace.id, _b.id)
+    llm_dps = [d for d in dps if d.kind == "llm"]
+    tool_dps = [d for d in dps if d.kind == "tool"]
+    assert len(llm_dps) == 2
+    assert all(d.meta.get("sandbox") == "dry-run" for d in llm_dps)
+    assert len(tool_dps) == 1
+    assert "sandbox" not in tool_dps[0].meta
+
+
+def test_fork_sandbox_llm_block(env):
+    """LLM block:不真调 + meta.sandbox=blocked(spec fork.LLM 决策点沙箱.LLM block 阻止)。"""
+    _, _, trace, root = _record(env, 2, ["a", "b"])
+    cursor, _b = _fork_cursor(env, trace, root, 0, sandbox={"llm": "block"})
+    _enter(cursor)
+    llm = FakeLLM(["X"])
+    outs = run_agent(env.interceptor, 1, llm)
+    _exit()
+    assert outs == [None]
+    assert llm.calls == 0
+    dps = env.store.get_decision_points(trace.id, _b.id)
+    llm_dps = [d for d in dps if d.kind == "llm"]
+    assert len(llm_dps) == 1
+    assert llm_dps[0].meta.get("sandbox") == "blocked"
+
+
+def test_fork_sandbox_llm_tool_mixed(env):
+    """混合配置 {llm: block, tool: allow}:LLM 拦下、工具照常真调(spec fork.LLM 决策点沙箱.混合配置按 kind 独立生效)。"""
+    _, _, trace, root = _record(env, 2, ["a", "b"])
+    cursor, _b = _fork_cursor(env, trace, root, 0, sandbox={"llm": "block", "tool": "allow"})
+    _enter(cursor)
+    llm = FakeLLM(["X"])
+    outs_llm = run_agent(env.interceptor, 1, llm)
+    tool_llm = FakeLLM(["Z"])
+    outs_tool = run_agent(env.interceptor, 1, tool_llm, kind="tool")
+    _exit()
+    assert outs_llm == [None]
+    assert llm.calls == 0
+    assert outs_tool == ["Z"]
+    assert tool_llm.calls == 1
+    dps = env.store.get_decision_points(trace.id, _b.id)
+    llm_dps = [d for d in dps if d.kind == "llm"]
+    tool_dps = [d for d in dps if d.kind == "tool"]
+    assert llm_dps[0].meta.get("sandbox") == "blocked"
+    assert "sandbox" not in tool_dps[0].meta
+
+
+def test_fork_sandbox_llm_default_real_call(env):
+    """LLM 未配置 sandbox 或显式 allow:照常真调(spec fork.LLM 决策点沙箱.LLM 未配置保持真调)。"""
+    _, _, trace, root = _record(env, 2, ["a", "b"])
+    for sb in (None, {"llm": "allow"}):
+        cursor, _b = _fork_cursor(env, trace, root, 0, sandbox=sb)
+        _enter(cursor)
+        llm = FakeLLM(["X"])
+        outs = run_agent(env.interceptor, 1, llm)
+        _exit()
+        assert outs == ["X"]
+        assert llm.calls == 1
+        dps = env.store.get_decision_points(trace.id, _b.id)
+        llm_dps = [d for d in dps if d.kind == "llm"]
+        assert "sandbox" not in llm_dps[0].meta

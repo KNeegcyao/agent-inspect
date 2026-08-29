@@ -36,4 +36,4 @@
 
 - [x] 7.1 README 补「跨进程追踪」说明,更新 Phase 2 规划
 - [x] 7.2 `openspec archive cross-process-trace --yes`
-- [ ] 7.3 commit + push
+- [x] 7.3 commit + push(`6add837`)

@@ -613,6 +613,72 @@ def test_fork_sandbox_e2e(session):
     assert {b["id"] for b in branches} == {root, fork_branch["id"]}  # 未新增分支
 
 
+def test_fork_sandbox_llm_e2e(session):
+    """LLM 决策点沙箱全链路:LLM dry-run 无真调 + meta 标记、工具未配置照常真调、混合配置独立生效。
+
+    覆盖 spec fork.LLM 决策点沙箱:LLM dry-run 模拟 / LLM block 阻止 / 混合配置按 kind 独立生效。
+    """
+    base = session.url
+    with session.trace() as tid:
+        run_agent(session.interceptor, 2, FakeLLM(["a", "b"]))
+    _st, data = _get(base, f"/api/traces/{tid}")
+    root = data["trace"]["root_branch_id"]
+
+    # ---- 1) 带 LLM sandbox 发起 Fork ----
+    st, res = _post(
+        base,
+        "/api/forks",
+        {
+            "trace_id": tid,
+            "branch_id": root,
+            "from_step": 0,
+            "sandbox": {"llm": "dry-run"},
+            "note": "llm sandbox e2e",
+        },
+    )
+    assert st == 200, res
+    fork_branch = res["branch"]
+    assert fork_branch["origin"] == "fork"
+
+    # ---- 2) 执行:LLM dry-run 不真调,工具未配置照常真调 ----
+    with session.trace():
+        llm_llm = FakeLLM(["X", "Y"])
+        outs_llm = run_agent(session.interceptor, 2, llm_llm, kind="llm")
+        tool_llm = FakeLLM(["Z"])
+        outs_tool = run_agent(session.interceptor, 1, tool_llm, kind="tool")
+    assert outs_llm == [None, None]
+    assert llm_llm.calls == 0  # LLM 被沙箱拦下,无真实调用
+    assert outs_tool == ["Z"]
+    assert tool_llm.calls == 1  # 工具未配置 → 照常真调
+
+    # ---- 3) 决策点经 API 读取沙箱标记 ----
+    _st, fpts = _get(base, f"/api/branches/{fork_branch['id']}/points")
+    assert [p["kind"] for p in fpts] == ["llm", "llm", "tool"]
+    assert all(p["meta"].get("sandbox") == "dry-run" for p in fpts if p["kind"] == "llm")
+    assert all("sandbox" not in p["meta"] for p in fpts if p["kind"] == "tool")
+
+    # ---- 4) 混合配置 {llm: block, tool: allow}:LLM 拦下、工具照常真调 ----
+    st, res2 = _post(
+        base,
+        "/api/forks",
+        {"trace_id": tid, "branch_id": root, "from_step": 0, "sandbox": {"llm": "block", "tool": "allow"}},
+    )
+    assert st == 200, res2
+    fork2 = res2["branch"]
+    with session.trace():
+        llm2 = FakeLLM(["X"])
+        outs2_llm = run_agent(session.interceptor, 1, llm2, kind="llm")
+        tool2 = FakeLLM(["Z"])
+        outs2_tool = run_agent(session.interceptor, 1, tool2, kind="tool")
+    assert outs2_llm == [None]
+    assert llm2.calls == 0
+    assert outs2_tool == ["Z"]
+    assert tool2.calls == 1
+    _st, fpts2 = _get(base, f"/api/branches/{fork2['id']}/points")
+    assert fpts2[0]["kind"] == "llm" and fpts2[0]["meta"].get("sandbox") == "blocked"
+    assert fpts2[1]["kind"] == "tool" and "sandbox" not in fpts2[1]["meta"]
+
+
 def test_cross_process_trace_e2e(session, tmp_path):
     """跨进程追踪:子进程带 env 记录 → 父 trace 的 children 含子 trace。
 

@@ -550,9 +550,13 @@ function PointDetails({ point, onFork }) {
       </div>
       {point.meta?.sandbox && (
         <div className={`sandbox-mark ${point.meta.sandbox}`}>
-          {point.meta.sandbox === 'dry-run'
-            ? '模拟执行(沙箱):未发起真实调用'
-            : '被沙箱阻止:未发起真实调用'}
+          {point.kind === 'llm'
+            ? point.meta.sandbox === 'dry-run'
+              ? 'LLM 模拟(沙箱):未发起真实调用'
+              : 'LLM 被沙箱阻止:未发起真实调用'
+            : point.meta.sandbox === 'dry-run'
+              ? '模拟执行(沙箱):未发起真实调用'
+              : '被沙箱阻止:未发起真实调用'}
         </div>
       )}
       <JsonBlock label="输入" data={point.input_context} />
@@ -582,7 +586,8 @@ function ForkPanel({ traceData, branchId, defaultStep, onCreated }) {
   const [fromStep, setFromStep] = useState(defaultStep ?? 0)
   const [mods, setMods] = useState([]) // {key, step, field, valueText}
   const [note, setNote] = useState('')
-  const [sandbox, setSandbox] = useState('allow') // 工具调用副作用策略
+  const [sandboxLlm, setSandboxLlm] = useState('allow') // LLM 决策点策略
+  const [sandboxTool, setSandboxTool] = useState('allow') // 工具调用副作用策略
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState(null)
 
@@ -633,13 +638,19 @@ function ForkPanel({ traceData, branchId, defaultStep, onCreated }) {
         modifications: parsed,
         note: note || undefined,
       }
-      if (sandbox !== 'allow') payload.sandbox = { tool: sandbox }
+      if (sandboxLlm !== 'allow' || sandboxTool !== 'allow') {
+        const sb = {}
+        if (sandboxLlm !== 'allow') sb.llm = sandboxLlm
+        if (sandboxTool !== 'allow') sb.tool = sandboxTool
+        payload.sandbox = sb
+      }
       const res = await api.createFork(payload)
       onCreated(res.branch)
       setOpen(false)
       setMods([])
       setNote('')
-      setSandbox('allow')
+      setSandboxLlm('allow')
+      setSandboxTool('allow')
     } catch (e) {
       setErr(e.message)
     } finally {
@@ -714,6 +725,29 @@ function ForkPanel({ traceData, branchId, defaultStep, onCreated }) {
       </div>
 
       <fieldset className="field sandbox-field">
+        <span>LLM 决策点策略(对 Fork 后缀的真实 LLM 调用生效)</span>
+        <div className="radio-row">
+          {[
+            ['allow', '放行', 'LLM 照常真实调用'],
+            ['dry-run', '模拟执行', '不真调,输出为空并标记模拟'],
+            ['block', '阻止', '不真调并标记阻止'],
+          ].map(([val, label, tip]) => (
+            <label key={val} className={`radio-opt ${sandboxLlm === val ? 'checked' : ''}`}>
+              <input
+                type="radio"
+                name="sandbox-llm"
+                value={val}
+                checked={sandboxLlm === val}
+                onChange={() => setSandboxLlm(val)}
+              />
+              <span>{label}</span>
+              <small>{tip}</small>
+            </label>
+          ))}
+        </div>
+      </fieldset>
+
+      <fieldset className="field sandbox-field">
         <span>工具调用副作用策略(对 Fork 后缀的真实工具调用生效)</span>
         <div className="radio-row">
           {[
@@ -721,13 +755,13 @@ function ForkPanel({ traceData, branchId, defaultStep, onCreated }) {
             ['dry-run', '模拟执行', '不真调,输出为空并标记模拟'],
             ['block', '阻止', '不真调并标记阻止'],
           ].map(([val, label, tip]) => (
-            <label key={val} className={`radio-opt ${sandbox === val ? 'checked' : ''}`}>
+            <label key={val} className={`radio-opt ${sandboxTool === val ? 'checked' : ''}`}>
               <input
                 type="radio"
-                name="sandbox"
+                name="sandbox-tool"
                 value={val}
-                checked={sandbox === val}
-                onChange={() => setSandbox(val)}
+                checked={sandboxTool === val}
+                onChange={() => setSandboxTool(val)}
               />
               <span>{label}</span>
               <small>{tip}</small>

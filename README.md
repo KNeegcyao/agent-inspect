@@ -54,7 +54,7 @@ That's it. No server to deploy. No database to configure. Interception is **zero
 
 **What you'll see:** a single-page panel rendering this run's decision chain — *think → tool → result* — as a tree. Click any decision point to read its full prompt. Hit **Fork**, change a prompt or a tool result, and the Agent re-executes the steps *after* your change while replaying the prefix for free (no real LLM calls on the prefix). Watch the two branches diverge, side by side.
 
-When you create a Fork you can also pick a **工具调用副作用策略** for the live suffix: `allow` (real tool calls, default), `dry-run` (the tool decision point records as *模拟执行(沙箱)* and never really runs), or `block` (records as *被沙箱阻止*). This isolates real side effects while you experiment — LLM calls still run, so you can see how the agent *would* respond, without the tool actually firing.
+When you create a Fork you can also pick a **副作用策略** for the live suffix — independently for **LLM 决策点** and **工具调用**: `allow` (real calls, default), `dry-run` (the decision point records as *模拟执行(沙箱)* and never really runs), or `block` (records as *被沙箱阻止*). This isolates real side effects while you experiment — e.g. block the LLM to see how the agent behaves with no response, or block the tool so it never actually fires.
 
 **Run it offline right now** (no API key needed — ships with a scripted chat model):
 
@@ -158,7 +158,7 @@ python examples/react_agent_cross_process.py   # 父进程记录 → 派生子�
 **In the MVP:**
 - Python-only SDK; auto-instruments **LangChain** and the **OpenAI** SDK.
 - Replay (read-only) + **Counterfactual Fork** (the flagship).
-- **Fork side-effect sandbox**: per-kind policies (`allow` / `dry-run` / `block`) isolate tool side effects on the live suffix.
+- **Fork side-effect sandbox**: per-kind policies (`allow` / `dry-run` / `block`) for both **LLM decision points** and **tool calls** isolate real side effects on the live suffix.
 - **Live (Mode C)**: attach to a running agent, conditional breakpoints, pause / step / continue, edit an input at a paused point.
 - **Cross-process tracing**: a child process that declares `AGENT_INSPECT_PARENT_TRACE` links its trace to the parent's — indented + **「跨进程」** badge in the panel.
 - One-line launch with a local panel; local file storage; zero external backend.
@@ -208,7 +208,7 @@ Spec is source of truth; prose docs explain *why* the spec says what it says.
 
 ## Status
 
-Pre-alpha / **MVP implemented, tested and archived**. The MVP (`add-agent-inspect-mvp`): one-line `agent_inspect.start()`, LangChain + OpenAI auto-instrumentation, Replay + Counterfactual Fork, local SQLite storage, single-page React panel. **Live debugging (Mode C)** (`add-live-debug-mode-c`): attach to a running agent, conditional breakpoints, pause / step / continue, edit input at a paused point. **Branch diff** (`add-branch-diff`): side-by-side compare of two branches with per-step status and field-level diff detail. **Fork side-effect sandbox** (`2026-08-28-fork-side-effect-sandbox`): per-kind policies isolate tool side effects on the live suffix. **Cross-process tracing** (`2026-08-28-cross-process-trace`): a child process declaring `AGENT_INSPECT_PARENT_TRACE` links its trace to the parent's. **93 tests green** (unit + integration + e2e), `openspec validate --all` passes, specs merged into baseline. UI rendering is verified in-browser.
+Pre-alpha / **MVP implemented, tested and archived**. The MVP (`add-agent-inspect-mvp`): one-line `agent_inspect.start()`, LangChain + OpenAI auto-instrumentation, Replay + Counterfactual Fork, local SQLite storage, single-page React panel. **Live debugging (Mode C)** (`add-live-debug-mode-c`): attach to a running agent, conditional breakpoints, pause / step / continue, edit input at a paused point. **Branch diff** (`add-branch-diff`): side-by-side compare of two branches with per-step status and field-level diff detail. **Fork side-effect sandbox** (`2026-08-28-fork-side-effect-sandbox`): per-kind policies isolate tool side effects on the live suffix. **Cross-process tracing** (`2026-08-28-cross-process-trace`): a child process declaring `AGENT_INSPECT_PARENT_TRACE` links its trace to the parent's. **LLM decision-point sandbox** (`2026-08-29-llm-decision-sandbox`): per-kind sandbox policies now cover LLM decision points too, independent of tool policy. **98 tests green** (unit + integration + e2e), `openspec validate --all` passes, specs merged into baseline. UI rendering is verified in-browser.
 
 ## License
 
