@@ -28,4 +28,4 @@
 
 - [x] 5.1 README 沙箱说明覆盖 LLM 决策点
 - [x] 5.2 `openspec archive 2026-08-29-llm-decision-sandbox --yes`
-- [ ] 5.3 commit + push
+- [x] 5.3 commit + push(`94a3fdf`)
