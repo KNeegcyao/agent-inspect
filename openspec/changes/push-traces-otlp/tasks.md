@@ -2,13 +2,13 @@
 
 ## 1. OpenSpec 文档
 
-- [ ] 1.1 `proposal.md` / `design.md`:推送的 why / 载荷包装 / 错误语义 / 范围
-- [ ] 1.2 `specs/trace-push/spec.md` delta:3 requirement(推送映射与送达 / 失败可观测 / 面板入口)共 5 场景
+- [x] 1.1 `proposal.md` / `design.md`:推送的 why / 载荷包装 / 错误语义 / 范围
+- [x] 1.2 `specs/trace-push/spec.md` delta:3 requirement(推送映射与送达 / 失败可观测 / 面板入口)共 5 场景
 
 ## 2. 后端推送器
 
-- [ ] 2.1 新建 `agent_inspect/pusher.py`:信封 → 推送载荷(scope 声明 + span kind:LLM=CLIENT/TOOL=INTERNAL),urllib POST(application/json,timeout),只读不落库
-- [ ] 2.2 `PushResult(delivered_spans, status_code, endpoint)`;非 2xx / 不可达 → `PushError`(含状态码或 unreachable 原因)
+- [x] 2.1 新建 `agent_inspect/pusher.py`:信封 → 推送载荷(scope 声明 + span kind:LLM=CLIENT/TOOL=INTERNAL),urllib POST(application/json,timeout),只读不落库
+- [x] 2.2 `PushResult(delivered_spans, status_code, endpoint)`;非 2xx / 不可达 → `PushError`(含状态码或 unreachable 原因)
 
 ## 3. API 与 UI
 
@@ -17,7 +17,7 @@
 
 ## 4. 测试
 
-- [ ] 4.1 单测(mock 收集端点):载荷与导出映射逐字段一致 + scope/kind;送达统计;非 2xx / 不可达错误;只读无写入
+- [x] 4.1 单测(mock 收集端点):载荷与导出映射逐字段一致 + scope/kind;送达统计;非 2xx / 不可达错误;只读无写入
 - [ ] 4.2 e2e:推送接口全链路(mock 端点)200/404/502
 - [ ] 4.3 全量 pytest 通过(含导入/导出零回归);确认零新增第三方依赖
 
