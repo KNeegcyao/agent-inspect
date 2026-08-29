@@ -4,7 +4,7 @@
 
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Status: pre-alpha](https://img.shields.io/badge/status-pre--alpha-orange.svg)](#status)
-[![Spec: 153 scenarios / 60 req](https://img.shields.io/badge/spec-153%20scenarios%20%2F%2060%20req-green.svg)](openspec/)
+[![Spec: 158 scenarios / 63 req](https://img.shields.io/badge/spec-158%20scenarios%20%2F%2063%20req-green.svg)](openspec/)
 
 **Agent-Inspect** is an interactive step-debugger for LLM Agents — not another tracing platform. It brings the Chrome DevTools / `pdb` experience to Agent development: drop in one line, and a local debug panel opens in your browser. You can inspect the full prompt at any decision point, change a prompt or a tool's return value, and fork a new branch to see what the Agent does *after the change* — without rerunning the whole thing.
 
