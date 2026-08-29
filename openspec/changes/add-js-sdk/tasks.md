@@ -2,15 +2,15 @@
 
 ## 1. OpenSpec 文档
 
-- [ ] 1.1 `proposal.md` / `design.md`:JS 运行时 SDK 的 why / 切片边界 / 存储与插桩选型
-- [ ] 1.2 `specs/js-sdk/spec.md` delta:4 requirement(一行启用 / 自动拦截 / Fork / 面板契约一致)共 9 场景
+- [x] 1.1 `proposal.md` / `design.md`:JS 运行时 SDK 的 why / 切片边界 / 存储与插桩选型
+- [x] 1.2 `specs/js-sdk/spec.md` delta:4 requirement(一行启用 / 自动拦截 / Fork / 面板契约一致)共 9 场景
 
 ## 2. 核心引擎(sdks/node)
 
-- [ ] 2.1 包脚手架:package.json(name/type/engines/scripts)、tsconfig(strict/NodeNext)、tsc 构建通过
-- [ ] 2.2 models + store:单文件 JSON、原子写、写队列串行、查询子集;单测(读写/并发串行/lastStepBefore)
-- [ ] 2.3 context(AsyncLocalStorage 游标)+ fork 控制器(校验:空链/越界/归属,不落库);单测
-- [ ] 2.4 interceptor 三态路由 + 注入路径补丁(嵌套/数组);单测(真调/回放/注入/dryRun)
+- [x] 2.1 包脚手架:package.json(name/type/engines/scripts)、tsconfig(strict/NodeNext)、tsc 构建通过
+- [x] 2.2 models + store:单文件 JSON、原子写、写队列串行、查询子集;单测(读写/并发串行/lastStepBefore)
+- [x] 2.3 context(AsyncLocalStorage 游标)+ fork 控制器(校验:空链/越界/归属,不落库);单测
+- [x] 2.4 interceptor 三态路由 + 注入路径补丁(嵌套/数组);单测(真调/回放/注入/dryRun)
 
 ## 3. 插桩与服务
 

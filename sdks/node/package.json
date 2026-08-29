@@ -1,0 +1,25 @@
+{
+  "name": "agent-inspect-node",
+  "version": "0.1.0",
+  "description": "The DevTools for AI Agents - JavaScript runtime SDK: record, inspect and counterfactually fork your LLM agents",
+  "type": "module",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "main": "dist/src/index.js",
+  "types": "dist/src/index.d.ts",
+  "files": [
+    "dist/src",
+    "panel"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "tsc -p tsconfig.json && node --test \"dist/tests/*.test.js\""
+  },
+  "devDependencies": {
+    "@types/node": "^26.4.0",
+    "openai": "^7.8.0",
+    "typescript": "^7.0.2"
+  }
+}
