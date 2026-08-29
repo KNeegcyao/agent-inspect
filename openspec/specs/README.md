@@ -16,6 +16,7 @@
 | 跨 trace 对比 | `branch-diff/spec.md`(跨 trace 能力) | `_server/app.py`(全局分支索引/跨 trace diff)、`web/`(按 trace 分组) | 基线(change `compare-traces`,已归档) |
 | 外部链路导入 | `trace-import/spec.md` | `importer.py`、`_server/app.py`、`web/` | 基线(change `import-openinference-traces`,已归档) |
 | 外部链路导出 | `trace-export/spec.md` | `exporter.py`、`_server/app.py`、`web/` | 基线(change `export-openinference-traces`,已归档) |
+| 外部链路推送 | `trace-push/spec.md` | `pusher.py`、`_server/app.py`、`web/` | 基线(change `push-traces-otlp`,已归档) |
 
 ## 显式不纳入 MVP 基线(后续 change 处理)
 

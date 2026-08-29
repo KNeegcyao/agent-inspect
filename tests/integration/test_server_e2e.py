@@ -305,8 +305,10 @@ def test_live_debug_mode_c_e2e(session):
     _wait_debug_paused(base, tid, 0)
 
     # ---- 单步 → step 1(携带 at_step:重复/迟到投递不会误放新暂停点)----
-    st, res = _post(base, f"/api/debug/{tid}/step", {"at_step": 0})
-    assert st == 200 and res["released"] is True
+    # 注意:若首次请求被服务端处理但响应因 10054 丢失,重试会返回 released=False——
+    # 释放已发生,故以最终暂停状态为准断言,不对单次响应的 released 过严。
+    st, _res = _post(base, f"/api/debug/{tid}/step", {"at_step": 0})
+    assert st == 200
     _wait_debug_paused(base, tid, 1)
 
     # ---- 改输入并继续:step 1 的 messages[0].content → "EDITED" ----
@@ -318,8 +320,11 @@ def test_live_debug_mode_c_e2e(session):
     assert st == 200 and res["ok"] is True
 
     # ---- 移除断点后继续放行 → agent 完成(continue 同样绑定暂停点)----
-    st, res = _delete(base, f"/api/debug/{tid}/breakpoints/{bp['id']}")
-    assert st == 200 and res["ok"] is True
+    # 断点 POST 若被 10054 重试会创建重复断点;移除该 trace 全部断点,确保 continue 后跑完
+    _st, bps = _get(base, f"/api/debug/{tid}/breakpoints")
+    for b in bps:
+        st, res = _delete(base, f"/api/debug/{tid}/breakpoints/{b['id']}")
+        assert st == 200 and res["ok"] is True
     _st, dstate = _get(base, f"/api/debug/{tid}/state")
     st, _ = _post(base, f"/api/debug/{tid}/continue", {"at_step": dstate.get("paused_at")})
     assert st == 200
