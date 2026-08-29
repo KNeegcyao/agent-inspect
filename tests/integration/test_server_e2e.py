@@ -766,6 +766,46 @@ def test_trace_import_e2e(session):
     assert len(_traces(base)) == before + 1
 
 
+def test_trace_export_e2e(session):
+    """导出 trace 决策链为 span 导出 JSON → 再导入内容一致(往返);缺失 trace 404。
+
+    覆盖 spec trace-export:导出映射 / 往返等价(经真实 HTTP)/ 导出入口与错误路径。
+    """
+    base = session.url
+    with session.trace() as tid:
+        run_agent(session.interceptor, 2, FakeLLM(["a", "b"]))
+    _st, data = _get(base, f"/api/traces/{tid}")
+    root = data["trace"]["root_branch_id"]
+    _st, orig_pts = _get(base, f"/api/branches/{root}/points")
+
+    # ---- 导出:附件下载头 + 合法 JSON ----
+    req = urllib.request.Request(base + f"/api/traces/{tid}/export")
+    with urllib.request.urlopen(req, timeout=5) as r:
+        assert r.status == 200
+        assert "attachment" in r.headers.get("Content-Disposition", "")
+        envelope = json.loads(r.read().decode("utf-8"))
+    spans = envelope["resourceSpans"][0]["scopeSpans"][0]["spans"]
+    assert len(spans) == 2
+    attrs0 = {a["key"]: a["value"] for a in spans[0]["attributes"]}
+    assert attrs0["openinference.span.kind"]["stringValue"] == "LLM"
+    out_msgs = json.loads(attrs0["llm.output_messages"]["stringValue"])
+    assert out_msgs[0]["message"]["content"] == "a"
+
+    # ---- 往返:导出文件导入 → 内容一致的链路 ----
+    st, res = _post(base, "/api/traces/import", envelope)
+    assert st == 200, res
+    assert res["decision_points"] == 2
+    _st, re_pts = _get(base, f"/api/branches/{res['root_branch_id']}/points")
+    assert [p["kind"] for p in re_pts] == [p["kind"] for p in orig_pts]
+    for a, b in zip(orig_pts, re_pts):
+        assert b["input_context"]["messages"] == a["input_context"]["messages"]
+        assert b["output"]["content"] == a["output"]["content"]
+
+    # ---- 错误路径:trace 不存在 404 ----
+    st, body = _get_error(base, "/api/traces/does-not-exist/export")
+    assert st == 404 and body.get("error")
+
+
 def test_cross_process_trace_e2e(session, tmp_path):
     """跨进程追踪:子进程带 env 记录 → 父 trace 的 children 含子 trace。
 

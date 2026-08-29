@@ -13,13 +13,13 @@
 
 ## 3. API 与 UI
 
-- [ ] 3.1 `GET /api/traces/{trace_id}/export`:合法导出附件下载(Content-Disposition);trace 不存在 404;空链返回空 spans 信封
-- [ ] 3.2 `web/src/api.js` 增 `exportTraceUrl(traceId)`;App.jsx 详情头加「导出」按钮(window.open 下载)
+- [x] 3.1 `GET /api/traces/{trace_id}/export`:合法导出附件下载(Content-Disposition);trace 不存在 404;空链返回空 spans 信封
+- [x] 3.2 `web/src/api.js` 增 `exportTraceUrl(traceId)`;App.jsx 详情头加「导出」按钮(window.open 下载)
 
 ## 4. 测试
 
 - [x] 4.1 单测:LLM/工具逐字段导出;顺序与父子链;空链;往返等价(导出 → 导入 → kind/顺序/输入输出逐一一致)
-- [ ] 4.2 e2e:导出接口(下载头/往返经真实 HTTP/404)
+- [x] 4.2 e2e:导出接口(下载头/往返经真实 HTTP/404)
 - [ ] 4.3 全量 pytest 通过(既有能力含导入零回归)
 
 ## 5. 验证与发布

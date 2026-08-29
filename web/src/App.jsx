@@ -367,6 +367,13 @@ export default function App() {
         ) : (
           <>
             <div className="trace-rel-bar">
+              <button
+                className="rel-chip"
+                title="导出该 trace 决策链为 span 导出 JSON"
+                onClick={() => window.open(api.exportTraceUrl(traceData.trace.id), '_blank')}
+              >
+                导出
+              </button>
               {traceData.imported && (
                 <span className="import-badge" title="由外部 span 导出导入">
                   导入链路

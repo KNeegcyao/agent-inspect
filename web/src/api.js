@@ -22,6 +22,9 @@ export const api = {
   getTrace(id) {
     return fetch(`/api/traces/${encodeURIComponent(id)}`).then(parse)
   },
+  exportTraceUrl(id) {
+    return `/api/traces/${encodeURIComponent(id)}/export`
+  },
   getBranchPoints(branchId) {
     return fetch(`/api/branches/${encodeURIComponent(branchId)}/points`).then(parse)
   },

@@ -13,12 +13,13 @@ from pathlib import Path
 from typing import Optional
 
 from fastapi import FastAPI, Request
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from .. import _models as m
 from ..adopt import preview_adopt
 from ..diff import diff_branches
+from ..exporter import export_trace
 from ..fork import Modification
 from ..importer import TraceImportError, import_trace
 
@@ -138,6 +139,20 @@ def create_app(session) -> FastAPI:
             "decision_points": res.decision_points,
             "skipped": res.skipped,
         }
+
+    @app.get("/api/traces/{trace_id}/export")
+    def export_trace_route(trace_id: str):
+        """导出 trace 决策链为 span 导出 JSON 附件(spec trace-export);只读,trace 缺失 404。"""
+        t = session.store.get_trace(trace_id)
+        if t is None:
+            return JSONResponse({"error": "trace not found"}, status_code=404)
+        envelope = export_trace(session.store, session.recorder, trace_id)
+        filename = f"{t.agent_name or 'trace'}-{trace_id[-8:]}.json"
+        return Response(
+            content=json.dumps(envelope, ensure_ascii=False),
+            media_type="application/json",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
 
     @app.post("/api/traces/{trace_id}/lifecycle")
     async def set_trace_lifecycle_route(trace_id: str, request: Request):
