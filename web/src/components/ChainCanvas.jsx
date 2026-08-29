@@ -4,13 +4,14 @@ import { kindLabel, outputPreview } from '../chain.js'
 
 const NODE_W = 300
 const NODE_H = 66
-const ROW_GAP = 26
-const DEPTH_STEP = 52
+const ROW_GAP = 26 // 纵向:深度方向(父子步骤)间距
+const COL_GAP = 40 // 横向:兄弟分叉间距
 const PAD = 50
 
 const KIND_COLORS = { llm: '#3b82f6', tool: '#f59e0b', default: '#8b5cf6' }
 
 // ---- 布局:D3-hierarchy tree(按 cause_edge 组树),Canvas 渲染节点 ----
+// 深度纵向(步骤自上而下),兄弟分叉横向展开——线性链为垂直步骤列表。
 function computeLayout(points) {
   if (!points.length) {
     return { nodes: [], edges: [], width: PAD * 2, height: PAD * 2 }
@@ -26,30 +27,38 @@ function computeLayout(points) {
   if (roots.length === 1) root = roots[0]
   else root = { id: '__virtual__', kind: 'root', children: roots }
 
-  const t = tree().nodeSize([NODE_H + ROW_GAP, DEPTH_STEP])
+  const t = tree().nodeSize([NODE_W + COL_GAP, NODE_H + ROW_GAP])
   // tree() 就地计算 x/y 并返回带 .each/.descendants 的 hierarchy 节点;
   // 若不接收返回值,下面 root.each 会抛 "r.each is not a function"。
   const h = t(hierarchy(root))
 
-  const nodes = []
-  const pos = new Map()
-  let maxX = 0
-  let maxY = 0
+  // 先收集原始坐标:x=兄弟横向(d3 以 0 居中,可负),y=深度纵向
+  const raw = []
   h.each((n) => {
     if (n.data.id === '__virtual__') return
-    const x = PAD + n.x // 纵向(行)
-    const y = PAD + n.y // 横向(深度列)
-    maxX = Math.max(maxX, x)
-    maxY = Math.max(maxY, y)
+    raw.push({ data: n.data, left: PAD + n.x, top: PAD + n.y })
+  })
+  // 归一化:最左节点对齐到 PAD,避免整棵树偏出画布
+  const minX = raw.length ? Math.min(...raw.map((r) => r.left)) : PAD
+
+  const nodes = []
+  const pos = new Map()
+  let maxW = 0
+  let maxH = 0
+  for (const r of raw) {
+    const left = r.left - minX + PAD
+    const top = r.top
+    maxW = Math.max(maxW, left)
+    maxH = Math.max(maxH, top)
     const node = {
-      ...n.data,
-      x,
-      y,
-      rect: { x: y - NODE_W / 2, y: x - NODE_H / 2, w: NODE_W, h: NODE_H },
+      ...r.data,
+      x: left,
+      y: top,
+      rect: { x: left, y: top, w: NODE_W, h: NODE_H },
     }
     nodes.push(node)
     pos.set(node.id, node)
-  })
+  }
   const edges = []
   for (const node of nodes) {
     const src = byId.get(node.id)
@@ -57,18 +66,18 @@ function computeLayout(points) {
       const cp = pos.get(child.id)
       if (!cp) continue
       edges.push({
-        x1: node.y,
-        y1: node.x + NODE_H / 2,
-        x2: cp.y,
-        y2: cp.x - NODE_H / 2,
+        x1: node.x + NODE_W / 2,
+        y1: node.y + NODE_H,
+        x2: cp.x + NODE_W / 2,
+        y2: cp.y,
       })
     }
   }
   return {
     nodes,
     edges,
-    width: Math.max(PAD * 2, maxY + NODE_W / 2 + PAD),
-    height: maxX + NODE_H / 2 + PAD,
+    width: Math.max(PAD * 2, maxW + NODE_W + PAD),
+    height: Math.max(PAD * 2, maxH + NODE_H + PAD),
   }
 }
 
