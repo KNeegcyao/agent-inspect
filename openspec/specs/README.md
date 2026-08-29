@@ -17,6 +17,7 @@
 | 外部链路导入 | `trace-import/spec.md` | `importer.py`、`_server/app.py`、`web/` | 基线(change `import-openinference-traces`,已归档) |
 | 外部链路导出 | `trace-export/spec.md` | `exporter.py`、`_server/app.py`、`web/` | 基线(change `export-openinference-traces`,已归档) |
 | 外部链路推送 | `trace-push/spec.md` | `pusher.py`、`_server/app.py`、`web/` | 基线(change `push-traces-otlp`,已归档) |
+| JS 运行时 SDK | `js-sdk/spec.md` | `sdks/node/`(TypeScript,同契约子集 + 面板复用) | 基线(change `add-js-sdk`,已归档) |
 
 ## 显式不纳入 MVP 基线(后续 change 处理)
 
