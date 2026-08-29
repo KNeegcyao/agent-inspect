@@ -132,6 +132,25 @@ export default function App() {
     return pts
   }, [])
 
+  // ---- 导入外部 span 导出 JSON(spec trace-import)----
+  const fileInputRef = useRef(null)
+  const onImportFile = useCallback(
+    async (e) => {
+      const file = e.target.files?.[0]
+      e.target.value = '' // 允许重复选择同一文件
+      if (!file) return
+      try {
+        const payload = JSON.parse(await file.text())
+        const res = await api.importTraces(payload)
+        await loadTraces()
+        await selectTrace(res.trace_id)
+      } catch (err) {
+        setError(`导入失败:${err.message}`)
+      }
+    },
+    [loadTraces, selectTrace]
+  )
+
   const branchesById = useMemo(() => {
     const m = {}
     // 全局分支优先作为单一事实源(覆盖跨 trace 对比时其它 trace 的分支)
@@ -308,6 +327,7 @@ export default function App() {
             >
               <div className="trace-line">
                 <span className="trace-name">{t.agent_name || t.id}</span>
+                {t.imported && <span className="import-badge">导入</span>}
                 {t.parent_trace_id && <span className="cross-proc-badge">跨进程</span>}
                 <span className={`life life-${t.lifecycle}`}>
                   {lifecycleLabel(t.lifecycle)}
@@ -321,9 +341,21 @@ export default function App() {
           ))}
         </div>
 
-        <button className="ghost-btn" onClick={loadTraces}>
-          刷新列表
-        </button>
+        <div className="side-actions">
+          <button className="ghost-btn" onClick={() => fileInputRef.current?.click()}>
+            导入 trace
+          </button>
+          <button className="ghost-btn" onClick={loadTraces}>
+            刷新列表
+          </button>
+        </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".json,application/json"
+          style={{ display: 'none' }}
+          onChange={onImportFile}
+        />
       </aside>
 
       <main className="main">
@@ -335,6 +367,11 @@ export default function App() {
         ) : (
           <>
             <div className="trace-rel-bar">
+              {traceData.imported && (
+                <span className="import-badge" title="由外部 span 导出导入">
+                  导入链路
+                </span>
+              )}
               {traceData.trace.parent_trace_id && (
                 <button
                   className="rel-chip"

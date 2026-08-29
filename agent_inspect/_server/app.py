@@ -20,6 +20,7 @@ from .. import _models as m
 from ..adopt import preview_adopt
 from ..diff import diff_branches
 from ..fork import Modification
+from ..importer import TraceImportError, import_trace
 
 
 class EventHub:
@@ -93,7 +94,11 @@ def create_app(session) -> FastAPI:
     # ---- traces ----
     @app.get("/api/traces")
     def list_traces(lifecycle: Optional[str] = None):
-        return [t.to_dict() for t in session.store.list_traces(lifecycle)]
+        imported = session.store.imported_trace_ids()
+        out = [t.to_dict() for t in session.store.list_traces(lifecycle)]
+        for d in out:
+            d["imported"] = d["id"] in imported
+        return out
 
     @app.get("/api/traces/{trace_id}")
     def get_trace(trace_id: str):
@@ -105,6 +110,33 @@ def create_app(session) -> FastAPI:
             "trace": t.to_dict(),
             "branches": [b.to_dict() for b in branches],
             "children": [c.to_dict() for c in session.store.list_child_traces(trace_id)],
+            "imported": trace_id in session.store.imported_trace_ids(),
+        }
+
+    @app.post("/api/traces/import")
+    async def import_traces_route(request: Request):
+        """导入外部 span 导出 JSON(spec trace-import):合法 → 新 trace;非法 → 422 不落库。"""
+        try:
+            body = await request.json()
+        except Exception:  # noqa: BLE001 - 非 JSON 体按可观测原因拒绝
+            return JSONResponse({"error": "request body is not valid JSON"}, status_code=422)
+        try:
+            res = import_trace(session.store, session.recorder, body)
+        except TraceImportError as e:
+            return JSONResponse({"error": str(e)}, status_code=422)
+        session.events.publish(
+            "trace.imported",
+            {
+                "trace_id": res.trace_id,
+                "decision_points": res.decision_points,
+                "skipped": res.skipped,
+            },
+        )
+        return {
+            "trace_id": res.trace_id,
+            "root_branch_id": res.root_branch_id,
+            "decision_points": res.decision_points,
+            "skipped": res.skipped,
         }
 
     @app.post("/api/traces/{trace_id}/lifecycle")

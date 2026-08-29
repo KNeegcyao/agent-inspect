@@ -14,6 +14,7 @@
 | Live 活体调试(Mode C) | `live-debug/spec.md` | `interceptor/`、`debug.py` | 基线(change `add-live-debug-mode-c`,已归档) |
 | 分支并排 diff | `branch-diff/spec.md` | `diff.py`、`_server/app.py`、`web/` | 基线(change `add-branch-diff`,已归档) |
 | 跨 trace 对比 | `branch-diff/spec.md`(跨 trace 能力) | `_server/app.py`(全局分支索引/跨 trace diff)、`web/`(按 trace 分组) | 基线(change `compare-traces`,已归档) |
+| 外部链路导入 | `trace-import/spec.md` | `importer.py`、`_server/app.py`、`web/` | 基线(change `import-openinference-traces`,已归档) |
 
 ## 显式不纳入 MVP 基线(后续 change 处理)
 

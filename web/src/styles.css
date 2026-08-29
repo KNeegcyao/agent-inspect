@@ -161,6 +161,27 @@ body {
   white-space: nowrap;
 }
 
+/* 导入来源徽标(trace 列表与详情头) */
+.import-badge {
+  font-size: 10px;
+  color: var(--accent-2);
+  border: 1px solid var(--accent-2);
+  border-radius: 8px;
+  padding: 0 6px;
+  margin-left: 6px;
+  margin-right: auto;
+  white-space: nowrap;
+}
+
+/* 侧栏底部操作行(导入 / 刷新) */
+.side-actions {
+  display: flex;
+  gap: 8px;
+}
+.side-actions .ghost-btn {
+  flex: 1;
+}
+
 .life {
   font-size: 11px;
   padding: 1px 8px;

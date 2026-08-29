@@ -50,6 +50,13 @@ export const api = {
       body: JSON.stringify(payload),
     }).then(parse)
   },
+  importTraces(payload) {
+    return fetch('/api/traces/import', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    }).then(parse)
+  },
   // ---- Mode C live 调试 ----
   debugAttach(traceId) {
     return fetch(`/api/debug/${encodeURIComponent(traceId)}/attach`, {

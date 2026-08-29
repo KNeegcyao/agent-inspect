@@ -682,6 +682,90 @@ def test_fork_sandbox_llm_e2e(session):
     assert fpts2[1]["kind"] == "tool" and "sandbox" not in fpts2[1]["meta"]
 
 
+def test_trace_import_e2e(session):
+    """导入外部 span 导出 JSON → imported 标记 → 对导入 trace 发起 Fork;非法导入 422 不落库。
+
+    覆盖 spec trace-import:导入映射(LLM/工具 span → 决策点)/ 与既有调试流打通
+    (查看、Fork 前缀回放导入输出)/ 非法导入可观测拒绝。
+    """
+    base = session.url
+
+    def _llm_span(span_id, parent, content, out, start):
+        return {
+            "span_id": span_id,
+            "parent_span_id": parent,
+            "name": f"llm-{span_id}",
+            "start_time": start,
+            "end_time": start + 15,
+            "attributes": {
+                "openinference.span.kind": "LLM",
+                "llm.model_name": "gpt-test",
+                "llm.input_messages.0.message.role": "user",
+                "llm.input_messages.0.message.content": content,
+                "llm.output_messages.0.message.content": out,
+            },
+        }
+
+    export = {
+        "agent_name": "imported-prod",
+        "spans": [
+            _llm_span("s1", None, "hi", "s0", 1720000000000),
+            _llm_span("s2", "s1", "go on", "s1", 1720000000010),
+            _llm_span("s3", "s2", "more", "s2", 1720000000020),
+            {  # 无 kind → 忽略并计数
+                "span_id": "sx",
+                "name": "agent-run",
+                "start_time": 1720000000005,
+                "end_time": 1720000000008,
+                "attributes": {},
+            },
+        ],
+    }
+
+    before = len(_traces(base))
+    st, res = _post(base, "/api/traces/import", export)
+    assert st == 200, res
+    assert res["decision_points"] == 3 and res["skipped"] == 1
+    tid = res["trace_id"]
+
+    # 列表与详情带 imported 标记;历史运行 lifecycle=done
+    traces = _traces(base)
+    assert len(traces) == before + 1
+    row = next(t for t in traces if t["id"] == tid)
+    assert row["imported"] is True and row["lifecycle"] == "done"
+    _st, data = _get(base, f"/api/traces/{tid}")
+    assert data["imported"] is True
+    root = data["trace"]["root_branch_id"]
+
+    # 决策点经既有查询读取:LLM span → llm 决策点,输入输出保真
+    _st, pts = _get(base, f"/api/branches/{root}/points")
+    assert [p["kind"] for p in pts] == ["llm", "llm", "llm"]
+    assert [p["step_index"] for p in pts] == [0, 1, 2]
+    assert pts[0]["input_context"]["messages"] == [{"role": "user", "content": "hi"}]
+    assert pts[0]["input_context"]["model"] == "gpt-test"
+    assert pts[0]["output"]["content"] == "s0"
+    assert pts[0]["meta"]["imported"] is True
+
+    # ---- 对导入链路发起 Fork:前缀回放导入输出(不真调),后缀真调 ----
+    st, f1 = _post(base, "/api/forks", {"trace_id": tid, "branch_id": root, "from_step": 2})
+    assert st == 200, f1
+    with session.trace():
+        llm = FakeLLM(["X"])
+        outs = run_agent(session.interceptor, 3, llm)
+    assert outs == ["s0", "s1", "X"]
+    assert llm.calls == 1
+    _st, fpts = _get(base, f"/api/branches/{f1['branch']['id']}/points")
+    assert [p["output"]["content"] for p in fpts] == ["X"]
+
+    # ---- 非法导入:422 + 可观测原因,不落库 ----
+    st, body = _post(base, "/api/traces/import", {"foo": 1})
+    assert st == 422 and body.get("error")
+    st, body = _post(base, "/api/traces/import", {"spans": [{"name": "x", "attributes": {}}]})
+    assert st == 422 and body.get("error")
+    assert "no importable spans" in body["error"]
+    assert len(_traces(base)) == before + 1
+
+
 def test_cross_process_trace_e2e(session, tmp_path):
     """跨进程追踪:子进程带 env 记录 → 父 trace 的 children 含子 trace。
 

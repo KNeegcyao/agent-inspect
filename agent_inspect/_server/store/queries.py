@@ -84,6 +84,23 @@ class Store:
             )
             self._conn.commit()
 
+    def set_trace_started_at(self, trace_id: str, started_at: float) -> None:
+        """导入 trace 用最早 span 起始时间覆盖 started_at(历史运行在列表中按真实时间排序)。"""
+        with self._lock:
+            self._conn.execute(
+                "UPDATE traces SET started_at=? WHERE id=?", (started_at, trace_id)
+            )
+            self._conn.commit()
+
+    def imported_trace_ids(self) -> set[str]:
+        """含 `meta.imported` 决策点的 trace 集合(导入来源标记,列表/详情徽标数据源)。"""
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT DISTINCT trace_id FROM decision_points WHERE meta_json LIKE ?",
+                ('%"imported": true%',),
+            ).fetchall()
+        return {r[0] for r in rows}
+
     def get_trace(self, trace_id: str) -> Optional[m.Trace]:
         with self._lock:
             row = self._conn.execute(
