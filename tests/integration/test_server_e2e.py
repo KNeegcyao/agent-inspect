@@ -806,6 +806,69 @@ def test_trace_export_e2e(session):
     assert st == 404 and body.get("error")
 
 
+def test_trace_push_e2e(session):
+    """推送 trace 决策链到收集端点:mock 端点收到与导出一致的载荷;404 / 502 错误路径。
+
+    覆盖 spec trace-push:推送映射一致 / 送达统计 / 失败可观测 / 只读。
+    """
+    import threading
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    base = session.url
+    with session.trace() as tid:
+        run_agent(session.interceptor, 2, FakeLLM(["a", "b"]))
+
+    captured: list[dict] = []
+
+    class H(BaseHTTPRequestHandler):
+        def do_POST(self):
+            length = int(self.headers.get("Content-Length") or 0)
+            captured.append(
+                {
+                    "path": self.path,
+                    "body": self.rfile.read(length),
+                }
+            )
+            self.send_response(200)
+            self.end_headers()
+
+        def log_message(self, *a):
+            pass
+
+    server = HTTPServer(("127.0.0.1", 0), H)
+    port = server.server_address[1]
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        # ---- 送达成功 ----
+        st, res = _post(base, f"/api/traces/{tid}/push", {"endpoint": f"http://127.0.0.1:{port}/v1/traces"})
+        assert st == 200, res
+        assert res["delivered"] == 2 and res["status_code"] == 200
+        assert captured[0]["path"] == "/v1/traces"
+        payload = json.loads(captured[0]["body"].decode("utf-8"))
+        spans = payload["resourceSpans"][0]["scopeSpans"][0]["spans"]
+        assert len(spans) == 2
+        assert payload["resourceSpans"][0]["scopeSpans"][0]["scope"]["name"] == "agent-inspect"
+
+        # 本地无变化(只读推送)
+        _st, data = _get(base, f"/api/traces/{tid}")
+        assert data["trace"]["lifecycle"] == "done"
+    finally:
+        server.shutdown()
+        server.server_close()
+
+    # ---- trace 不存在 404 ----
+    st, body = _post(base, "/api/traces/does-not-exist/push", {"endpoint": f"http://127.0.0.1:{port}/v1/traces"})
+    assert st == 404 and body.get("error")
+
+    # ---- 端点不可达 502 ----
+    st, body = _post(base, f"/api/traces/{tid}/push", {"endpoint": "http://127.0.0.1:9/v1/traces", "timeout": 1})
+    assert st == 502 and body.get("error")
+
+    # ---- endpoint 非法 422 ----
+    st, body = _post(base, f"/api/traces/{tid}/push", {"endpoint": "ftp://nope"})
+    assert st == 422 and body.get("error")
+
+
 def test_cross_process_trace_e2e(session, tmp_path):
     """跨进程追踪:子进程带 env 记录 → 父 trace 的 children 含子 trace。
 

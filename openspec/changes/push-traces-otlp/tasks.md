@@ -12,13 +12,13 @@
 
 ## 3. API 与 UI
 
-- [ ] 3.1 `POST /api/traces/{trace_id}/push`:endpoint/timeout 校验,成功 200 回报 delivered;trace 缺失 404;PushError 502
-- [ ] 3.2 `web/src/api.js` 增 `pushTrace`;App.jsx 详情头「推送」按钮(prompt 端点,默认 4318 路径);成功「已送达 ×N」chip,失败错误条
+- [x] 3.1 `POST /api/traces/{trace_id}/push`:endpoint/timeout 校验,成功 200 回报 delivered;trace 缺失 404;PushError 502
+- [x] 3.2 `web/src/api.js` 增 `pushTrace`;App.jsx 详情头「推送」按钮(prompt 端点,默认 4318 路径);成功「已送达 ×N」chip,失败错误条
 
 ## 4. 测试
 
 - [x] 4.1 单测(mock 收集端点):载荷与导出映射逐字段一致 + scope/kind;送达统计;非 2xx / 不可达错误;只读无写入
-- [ ] 4.2 e2e:推送接口全链路(mock 端点)200/404/502
+- [x] 4.2 e2e:推送接口全链路(mock 端点)200/404/502
 - [ ] 4.3 全量 pytest 通过(含导入/导出零回归);确认零新增第三方依赖
 
 ## 5. 验证与发布

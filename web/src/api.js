@@ -60,6 +60,13 @@ export const api = {
       body: JSON.stringify(payload),
     }).then(parse)
   },
+  pushTrace(traceId, endpoint, timeout) {
+    return fetch(`/api/traces/${encodeURIComponent(traceId)}/push`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ endpoint, timeout }),
+    }).then(parse)
+  },
   // ---- Mode C live 调试 ----
   debugAttach(traceId) {
     return fetch(`/api/debug/${encodeURIComponent(traceId)}/attach`, {

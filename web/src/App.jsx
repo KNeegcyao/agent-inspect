@@ -289,6 +289,26 @@ export default function App() {
     [debugCmd]
   )
 
+  // ---- 推送到收集端点(spec trace-push):prompt 端点,结果以 chip / 错误条呈现 ----
+  const [pushedMsg, setPushedMsg] = useState(null) // {tid, msg}
+  const onPush = useCallback(async () => {
+    const id = traceDataRef.current?.trace?.id
+    if (!id) return
+    const endpoint = window.prompt(
+      '收集端点地址(OTLP/HTTP JSON):',
+      'http://127.0.0.1:4318/v1/traces'
+    )
+    if (!endpoint) return
+    try {
+      const res = await api.pushTrace(id, endpoint)
+      setPushedMsg({ tid: id, msg: `已送达 ×${res.delivered}` })
+      setError(null)
+    } catch (e) {
+      setPushedMsg(null)
+      setError(`推送失败:${e.message}`)
+    }
+  }, [])
+
   // 打开采纳差异弹层(主/对比分支均选中时可用)
   const openAdopt = useCallback(() => {
     if (!activeBranchId || !compareBranchId) return
@@ -374,6 +394,16 @@ export default function App() {
               >
                 导出
               </button>
+              <button
+                className="rel-chip"
+                title="推送该 trace 决策链到收集端点"
+                onClick={onPush}
+              >
+                推送
+              </button>
+              {pushedMsg && pushedMsg.tid === traceData.trace.id && (
+                <span className="import-badge">{pushedMsg.msg}</span>
+              )}
               {traceData.imported && (
                 <span className="import-badge" title="由外部 span 导出导入">
                   导入链路

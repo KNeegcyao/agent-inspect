@@ -22,6 +22,7 @@ from ..diff import diff_branches
 from ..exporter import export_trace
 from ..fork import Modification
 from ..importer import TraceImportError, import_trace
+from ..pusher import PushError, push_trace
 
 
 class EventHub:
@@ -153,6 +154,33 @@ def create_app(session) -> FastAPI:
             media_type="application/json",
             headers={"Content-Disposition": f'attachment; filename="{filename}"'},
         )
+
+    @app.post("/api/traces/{trace_id}/push")
+    async def push_trace_route(trace_id: str, request: Request):
+        """推送 trace 决策链到用户收集端点(spec trace-push);只读,失败 502 可观测。"""
+        if session.store.get_trace(trace_id) is None:
+            return JSONResponse({"error": "trace not found"}, status_code=404)
+        try:
+            body = await request.json()
+        except Exception:  # noqa: BLE001 - 非 JSON 体按可观测原因拒绝
+            return JSONResponse({"error": "request body is not valid JSON"}, status_code=422)
+        endpoint = body.get("endpoint")
+        if not endpoint or not str(endpoint).startswith(("http://", "https://")):
+            return JSONResponse({"error": "endpoint must be an http(s) URL"}, status_code=422)
+        try:
+            timeout = float(body.get("timeout") or 10.0)
+        except (TypeError, ValueError):
+            return JSONResponse({"error": "timeout must be a number"}, status_code=422)
+        timeout = min(max(timeout, 1.0), 60.0)
+        try:
+            res = push_trace(session.store, session.recorder, trace_id, str(endpoint), timeout=timeout)
+        except PushError as e:
+            return JSONResponse({"error": str(e)}, status_code=502)
+        return {
+            "delivered": res.delivered_spans,
+            "endpoint": res.endpoint,
+            "status_code": res.status_code,
+        }
 
     @app.post("/api/traces/{trace_id}/lifecycle")
     async def set_trace_lifecycle_route(trace_id: str, request: Request):
