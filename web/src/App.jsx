@@ -151,6 +151,21 @@ export default function App() {
     [loadTraces, selectTrace]
   )
 
+  // ---- 删除 trace(spec recording.trace 删除管理):confirm → 删除 → 刷新;删当前选中回空态 ----
+  const onDeleteTrace = useCallback(
+    async (id) => {
+      if (!window.confirm('将删除该 trace 及其全部分支与决策点,确定?')) return
+      try {
+        await api.deleteTrace(id)
+        if (traceDataRef.current?.trace?.id === id) setTraceData(null)
+        await loadTraces()
+      } catch (e) {
+        setError(`删除失败:${e.message}`)
+      }
+    },
+    [loadTraces]
+  )
+
   const branchesById = useMemo(() => {
     const m = {}
     // 全局分支优先作为单一事实源(覆盖跨 trace 对比时其它 trace 的分支)
@@ -200,6 +215,10 @@ export default function App() {
         onActiveTrace
       ) {
         api.debugState(payload.trace_id).then(setDebugState).catch(() => {})
+      }
+      if (event === 'trace.deleted') {
+        if (activeId && payload.trace_id === activeId) setTraceData(null)
+        loadTraces()
       }
     }, setConn)
     return () => es.close()
@@ -340,24 +359,32 @@ export default function App() {
         <div className="trace-list">
           {traces.length === 0 && <div className="empty-hint">暂无 trace</div>}
           {traces.map((t) => (
-            <button
-              key={t.id}
-              className={`trace-item ${t.id === traceData?.trace?.id ? 'trace-active' : ''} ${t.parent_trace_id ? 'trace-child' : ''}`}
-              onClick={() => selectTrace(t.id)}
-            >
-              <div className="trace-line">
-                <span className="trace-name">{t.agent_name || t.id}</span>
-                {t.imported && <span className="import-badge">导入</span>}
-                {t.parent_trace_id && <span className="cross-proc-badge">跨进程</span>}
-                <span className={`life life-${t.lifecycle}`}>
-                  {lifecycleLabel(t.lifecycle)}
-                </span>
-              </div>
-              <div className="trace-sub">
-                <span>{fmtTime(t.started_at)}</span>
-                <span>{t.id.slice(-8)}</span>
-              </div>
-            </button>
+            <div key={t.id} className="trace-row">
+              <button
+                className={`trace-item ${t.id === traceData?.trace?.id ? 'trace-active' : ''} ${t.parent_trace_id ? 'trace-child' : ''}`}
+                onClick={() => selectTrace(t.id)}
+              >
+                <div className="trace-line">
+                  <span className="trace-name">{t.agent_name || t.id}</span>
+                  {t.imported && <span className="import-badge">导入</span>}
+                  {t.parent_trace_id && <span className="cross-proc-badge">跨进程</span>}
+                  <span className={`life life-${t.lifecycle}`}>
+                    {lifecycleLabel(t.lifecycle)}
+                  </span>
+                </div>
+                <div className="trace-sub">
+                  <span>{fmtTime(t.started_at)}</span>
+                  <span>{t.id.slice(-8)}</span>
+                </div>
+              </button>
+              <button
+                className="trace-del"
+                title="删除该 trace"
+                onClick={() => onDeleteTrace(t.id)}
+              >
+                删除
+              </button>
+            </div>
           ))}
         </div>
 

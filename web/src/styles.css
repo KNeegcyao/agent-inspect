@@ -107,6 +107,30 @@ body {
   overflow-y: auto;
 }
 
+.trace-row {
+  position: relative;
+}
+.trace-del {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: none;
+  font-size: 10px;
+  color: var(--danger);
+  border: 1px solid var(--danger);
+  border-radius: 8px;
+  background: var(--panel);
+  padding: 1px 6px;
+  cursor: pointer;
+}
+.trace-row:hover .trace-del {
+  display: block;
+}
+.trace-del:hover {
+  background: var(--danger);
+  color: #0b1020;
+}
+
 .trace-item {
   text-align: left;
   background: var(--panel-2);

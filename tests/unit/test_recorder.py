@@ -137,3 +137,38 @@ def test_same_tick_breakpoints_insertion_order(monkeypatch, env):
     bp1 = env.store.add_breakpoint(trace.id, kind="llm")
     bp2 = env.store.add_breakpoint(trace.id, condition="x")
     assert [b.id for b in env.store.list_breakpoints(trace.id)] == [bp1.id, bp2.id]
+
+
+def test_delete_trace_cascades_and_isolates(env):
+    """trace 删除:级联清分支/决策点/断点;其它 trace 完好(spec recording.trace 删除管理)。"""
+    from agent_inspect._models import new_id
+
+    t1 = env.store.create_trace_with_root("a")
+    t2 = env.store.create_trace_with_root("b")
+    # t1:fork 分支 + 决策点 + 上下文 diff + 断点
+    tid1, root1 = t1[0].id, t1[1].id
+    d0 = _mk_dp(root1, 0, {"messages": [{"role": "user", "content": "hello"}]}, {"content": "a"})
+    d0.trace_id = tid1
+    env.store.write_decision_point(d0)
+    br2 = env.store.create_branch(tid1, root1, 1, "fork", None)  # root1 已是 id 字符串
+    d1 = _mk_dp(br2.id, 1, {"messages": [{"role": "user", "content": "hello world"}]}, {"content": "b"})
+    d1.trace_id = tid1
+    env.store.write_decision_point(d1)
+    env.store.write_context_diff(new_id("ctx"), br2.id, 1, 0, [{"op": "replace", "path": [], "value": {}}])
+    env.store.add_breakpoint(t1[0].id, kind="llm")
+    # t2:一个决策点(必须完好)
+    tid2, root2 = t2[0].id, t2[1].id
+    dkeep = _mk_dp(root2, 0, {}, {"content": "keep"})
+    dkeep.trace_id = tid2
+    env.store.write_decision_point(dkeep)
+
+    assert env.store.delete_trace(t1[0].id) is True
+    assert env.store.delete_trace(t1[0].id) is False  # 再删 → 不存在
+    assert env.store.get_trace(t1[0].id) is None
+    assert env.store.list_branches(t1[0].id) == []
+    assert env.store.get_decision_points(t1[0].id, root1) == []
+    assert env.store.get_decision_points(t1[0].id, br2.id) == []
+    assert env.store.list_breakpoints(t1[0].id) == []
+    # 隔离:t2 完好
+    assert env.store.get_trace(t2[0].id) is not None
+    assert len(env.store.get_decision_points(t2[0].id, root2)) == 1

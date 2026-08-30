@@ -771,6 +771,35 @@ def test_trace_import_e2e(session):
     assert len(_traces(base)) == before + 1
 
 
+def test_trace_delete_e2e(session):
+    """删除 trace:级联清理 + 隔离(其它 trace 完好)+ 重复删除 404(spec recording.trace 删除管理)。"""
+    base = session.url
+    with session.trace() as tid1:
+        run_agent(session.interceptor, 2, FakeLLM(["a", "b"]))
+    with session.trace() as tid2:
+        run_agent(session.interceptor, 1, FakeLLM(["keep"]))
+
+    st, res = _delete(base, f"/api/traces/{tid1}")
+    assert st == 200 and res["ok"] is True
+
+    # 列表不再含被删 trace;另一条完好
+    traces = _traces(base)
+    ids = {t["id"] for t in traces}
+    assert tid1 not in ids and tid2 in ids
+
+    # 详情 / 决策点全部不可查
+    st, body = _get_error(base, f"/api/traces/{tid1}")
+    assert st == 404
+    _st, data2 = _get(base, f"/api/traces/{tid2}")
+    root2 = data2["trace"]["root_branch_id"]
+    _st, pts2 = _get(base, f"/api/branches/{root2}/points")
+    assert [p["output"]["content"] for p in pts2] == ["keep"]
+
+    # 重复删除 → 404
+    st, body = _delete(base, f"/api/traces/{tid1}")
+    assert st == 404 and body.get("error")
+
+
 def test_trace_export_e2e(session):
     """导出 trace 决策链为 span 导出 JSON → 再导入内容一致(往返);缺失 trace 404。
 

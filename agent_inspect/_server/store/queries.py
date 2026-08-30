@@ -84,6 +84,30 @@ class Store:
             )
             self._conn.commit()
 
+    def delete_trace(self, trace_id: str) -> bool:
+        """级联删除一条 trace:决策点 / 上下文 diff / 分支 / 断点 / trace 行。
+
+        blobs 不删(内容寻址、跨 trace 共享,孤儿块无行为影响)。
+        返回 trace 是否存在。
+        """
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT 1 FROM traces WHERE id=?", (trace_id,)
+            ).fetchone()
+            if row is None:
+                return False
+            self._conn.execute("DELETE FROM decision_points WHERE trace_id=?", (trace_id,))
+            self._conn.execute(
+                "DELETE FROM context_diffs WHERE branch_id IN "
+                "(SELECT id FROM branches WHERE trace_id=?)",
+                (trace_id,),
+            )
+            self._conn.execute("DELETE FROM breakpoints WHERE trace_id=?", (trace_id,))
+            self._conn.execute("DELETE FROM branches WHERE trace_id=?", (trace_id,))
+            self._conn.execute("DELETE FROM traces WHERE id=?", (trace_id,))
+            self._conn.commit()
+        return True
+
     def set_trace_started_at(self, trace_id: str, started_at: float) -> None:
         """导入 trace 用最早 span 起始时间覆盖 started_at(历史运行在列表中按真实时间排序)。"""
         with self._lock:

@@ -141,6 +141,14 @@ def create_app(session) -> FastAPI:
             "skipped": res.skipped,
         }
 
+    @app.delete("/api/traces/{trace_id}")
+    def delete_trace_route(trace_id: str):
+        """删除一条 trace(级联分支/决策点/断点;spec recording.trace 删除管理)。"""
+        if not session.store.delete_trace(trace_id):
+            return JSONResponse({"error": "trace not found"}, status_code=404)
+        session.events.publish("trace.deleted", {"trace_id": trace_id})
+        return {"ok": True, "trace_id": trace_id}
+
     @app.get("/api/traces/{trace_id}/export")
     def export_trace_route(trace_id: str):
         """导出 trace 决策链为 span 导出 JSON 附件(spec trace-export);只读,trace 缺失 404。"""
