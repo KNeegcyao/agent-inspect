@@ -98,6 +98,14 @@ export class Store {
     return t ? { ...t } : null;
   }
 
+  setTraceStartedAt(id: string, startedAt: number): void {
+    const t = this.data.traces.find((x) => x.id === id);
+    if (t) {
+      t.started_at = startedAt;
+      this.scheduleSave();
+    }
+  }
+
   setTraceLifecycle(id: string, lifecycle: Lifecycle): void {
     const t = this.data.traces.find((x) => x.id === id);
     if (t) {

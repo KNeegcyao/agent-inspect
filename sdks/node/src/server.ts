@@ -5,6 +5,8 @@ import { join, extname } from "node:path";
 import { ForkError, type Modification } from "./fork.js";
 import { diffBranches, DiffError, previewAdopt } from "./diff.js";
 import { TraceExportError, exportTrace } from "./exporter.js";
+import { TraceImportError, importTrace } from "./importer.js";
+import { PushError, pushTrace } from "./pusher.js";
 import type { Session } from "./session.js";
 
 const MIME: Record<string, string> = {
@@ -146,6 +148,34 @@ async function apiRoute(
     return json(res, 404, { error: "not found" });
   }
 
+  // POST /api/traces/import(外部 span 导出导入)
+  if (method === "POST" && path === "/api/traces/import") {
+    const bodyText = await readRaw(req);
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(bodyText);
+    } catch {
+      return json(res, 422, { error: "request body is not valid JSON" });
+    }
+    try {
+      const r = importTrace(store, parsed);
+      session.emit("trace.imported", {
+        trace_id: r.traceId,
+        decision_points: r.decisionPoints,
+        skipped: r.skipped,
+      });
+      return json(res, 200, {
+        trace_id: r.traceId,
+        root_branch_id: r.rootBranchId,
+        decision_points: r.decisionPoints,
+        skipped: r.skipped,
+      });
+    } catch (e) {
+      if (e instanceof TraceImportError) return json(res, 422, { error: e.message });
+      throw e;
+    }
+  }
+
   // /api/traces/*
   if (seg[1] === "traces") {
     if (!seg[2]) return notFound(res);
@@ -165,6 +195,22 @@ async function apiRoute(
       });
       res.end(JSON.stringify(envelope));
       return;
+    }
+    if (seg.length === 4 && seg[3] === "push" && method === "POST") {
+      if (!t0(session, traceId)) return json(res, 404, { error: "trace not found" });
+      const body = await readJson(req);
+      const endpoint = body["endpoint"];
+      if (!endpoint || !String(endpoint).startsWith("http")) {
+        return json(res, 422, { error: "endpoint must be an http(s) URL" });
+      }
+      const timeoutMs = Number(body["timeoutMs"] ?? 10000) || 10000;
+      try {
+        const r = await pushTrace(store, traceId, String(endpoint), timeoutMs);
+        return json(res, 200, { delivered: r.delivered, endpoint: r.endpoint, status_code: r.statusCode });
+      } catch (e) {
+        if (e instanceof PushError) return json(res, 502, { error: e.message });
+        throw e;
+      }
     }
     if (seg.length === 4 && seg[3] === "lifecycle" && method === "POST") {
       const body = await readJson(req);
@@ -232,6 +278,16 @@ async function apiRoute(
 
 function notFound(res: ServerResponse): void {
   json(res, 404, { error: "not found" });
+}
+
+async function readRaw(req: IncomingMessage): Promise<string> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of req) chunks.push(chunk as Buffer);
+  return Buffer.concat(chunks).toString("utf-8");
+}
+
+function t0(session: Session, traceId: string): boolean {
+  return !!session.store.getTrace(traceId);
 }
 
 async function readJson(req: IncomingMessage): Promise<Record<string, unknown>> {

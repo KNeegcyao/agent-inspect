@@ -2,14 +2,14 @@
 
 ## 1. OpenSpec 文档
 
-- [ ] 1.1 `proposal.md` / `design.md`:导入/推送的 why / 移植映射 / 范围
-- [ ] 1.2 `specs/js-sdk/spec.md` delta:「导入与推送」1 requirement 共 2 场景
+- [x] 1.1 `proposal.md` / `design.md`:导入/推送的 why / 移植映射 / 范围
+- [x] 1.2 `specs/js-sdk/spec.md` delta:「导入与推送」1 requirement 共 2 场景
 
 ## 2. 实现
 
-- [ ] 2.1 `importer.ts`(两形态/拍平/映射/DFS/拒绝);单测
-- [ ] 2.2 `pusher.ts`(载荷包装 + fetch 推送);单测(mock 收集端)
-- [ ] 2.3 `server.ts` 两端点(422/404/502);e2e(HTTP 全链路)
+- [x] 2.1 `importer.ts`(两形态/拍平/映射/DFS/拒绝);单测
+- [x] 2.2 `pusher.ts`(载荷包装 + fetch 推送);单测(mock 收集端)
+- [x] 2.3 `server.ts` 两端点(422/404/502);e2e(HTTP 全链路)
 
 ## 3. 验证与发布
 
