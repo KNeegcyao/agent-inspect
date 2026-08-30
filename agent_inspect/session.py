@@ -56,6 +56,7 @@ class Session:
         record_mode: str = "dev",
         blob_threshold: int = 4096,
         ui_dir: Optional[str] = None,
+        instrument: Optional[dict] = None,
     ) -> None:
         self.db_path = Path(db_path or DEFAULT_DB)
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
@@ -75,7 +76,14 @@ class Session:
         self.fork = ForkController(self.store)
         self.debug = DebugController(self.store, on_event=self.events.publish)
         self.interceptor = Interceptor(self.recorder, controller=self.fork, debug=self.debug)
-        self._patchers = [LangChainPatcher(), OpenAIPatcher()]
+        # ---- 插桩模块开关(spec interception.插桩模块开关):缺省全启用 ----
+        instrument_cfg = instrument or {}
+        patcher_classes = []
+        if instrument_cfg.get("langchain", True):
+            patcher_classes.append(LangChainPatcher)
+        if instrument_cfg.get("openai", True):
+            patcher_classes.append(OpenAIPatcher)
+        self._patchers = [cls() for cls in patcher_classes]
         self._server: Optional[uvicorn.Server] = None
         self._thread: Optional[threading.Thread] = None
         self._stopped = False
