@@ -21,6 +21,7 @@
 | 决策点搜索 | `trace-search/spec.md` | `search.py`、`_server/app.py`、`web/` | 基线(change `search-decision-points`,已归档) |
 | 跨 trace 全局搜索 | `trace-search/spec.md`(全局能力) | `_server/app.py`、`web/` 侧栏 | 基线(change `global-search`,已归档) |
 | 面板主题切换 | `trace-ui/spec.md`(主题能力) | `web/`(调色板/画布变量/持久化) | 基线(change `panel-theme-toggle`,已归档) |
+| JS 运行时 Live 调试 | `js-sdk/spec.md`(Live 能力) | `sdks/node/`(debug.ts/端点/断点持久化) | 基线(change `node-live-debug`,已归档) |
 
 ## 显式不纳入 MVP 基线(后续 change 处理)
 

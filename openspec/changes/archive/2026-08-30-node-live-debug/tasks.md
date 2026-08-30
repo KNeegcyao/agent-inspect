@@ -13,10 +13,10 @@
 ## 3. 服务与集成
 
 - [x] 3.1 服务端点(attach/state/breakpoints/pause/step/continue/modify,同契约含 at_step/released);集成测试(HTTP 全流程:慢速 Agent attach→断点→step→modify→continue→落盘差异)
-- [ ] 3.2 面板调试工具栏连通(Node 面板下可用)
+- [x] 3.2 面板调试工具栏连通(Node 面板下可用)
 
 ## 4. 验证与发布
 
 - [x] 4.1 全量 node:test 通过;Python pytest 零回归;`npm run build` 通过
-- [ ] 4.2 SDK README 语义差异说明更新;`openspec validate --all` 通过
-- [ ] 4.3 `openspec archive node-live-debug`;commit + push
+- [x] 4.2 SDK README 语义差异说明更新;`openspec validate --all` 通过
+- [x] 4.3 `openspec archive node-live-debug`;commit + push

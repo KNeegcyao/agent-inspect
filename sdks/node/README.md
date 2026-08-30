@@ -25,7 +25,7 @@ const tid = await session.trace(async () => {
 - **多步链要显式括进 trace**:未包裹在 `session.trace()` 里的裸调用各自成一条 trace(JS 的 AsyncLocalStorage 不像 Python contextvar 那样向上传播);
 - 自动插桩面:OpenAI Node SDK 的 `chat.completions.create`(`stream: true` 原样放行);未安装 openai 时静默跳过;
 - 存储:单文件 JSON(默认 `~/.agent-inspect/agent-inspect-node.json`),与 Python 的 SQLite 不同库但行为契约一致;
-- 面板契约子集:traces / branches / points / diff / adopt / forks / export / lifecycle / SSE。**导入、推送、Live 调试、副作用沙箱暂不可用**(对应按钮会报错)。
+- 面板契约子集:traces / branches / points / diff / adopt / forks / export / lifecycle / SSE / **Live 调试全端点**(附加/断点/暂停/单步/改输入/继续,含 at_step 幂等绑定)。**导入、推送、副作用沙箱暂不可用**(对应按钮会报错)。
 
 ## 开发
 
