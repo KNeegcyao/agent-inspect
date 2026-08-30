@@ -12,15 +12,15 @@
 
 ## 3. UI
 
-- [ ] 3.1 api.js `searchTrace`;App.jsx 工具栏搜索框(防抖)+ 结果浮层(高亮片段)+ 点击定位(切分支 + 选中点)+ Esc/清空收起
-- [ ] 3.2 浮层与命中高亮样式
+- [x] 3.1 api.js `searchTrace`;App.jsx 工具栏搜索框(防抖)+ 结果浮层(高亮片段)+ 点击定位(切分支 + 选中点)+ Esc/清空收起
+- [x] 3.2 浮层与命中高亮样式
 
 ## 4. 测试与回归
 
 - [x] 4.1 e2e:搜索命中(大小写不敏感标注 output)/ 404 / 422
-- [ ] 4.2 全量 pytest 通过,零回归;`npm run build` 通过
+- [x] 4.2 全量 pytest 通过,零回归;`npm run build` 通过
 
 ## 5. 验证与发布
 
-- [ ] 5.1 `openspec validate --all` 通过
-- [ ] 5.2 README 补搜索一句;`openspec/archive search-decision-points`;commit + push
+- [x] 5.1 `openspec validate --all` 通过
+- [x] 5.2 README 补搜索一句;`openspec/archive search-decision-points`;commit + push
