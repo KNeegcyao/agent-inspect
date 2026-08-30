@@ -13,5 +13,5 @@
 
 ## 3. 验证与发布
 
-- [ ] 3.1 全量 node:test 零回归;Python pytest 零回归;`npm run build` 通过
-- [ ] 3.2 `openspec validate --all` 通过;`openspec archive node-import-push`;commit + push
+- [x] 3.1 全量 node:test 零回归;Python pytest 零回归;`npm run build` 通过
+- [x] 3.2 `openspec validate --all` 通过;`openspec archive node-import-push`;commit + push

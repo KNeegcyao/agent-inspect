@@ -25,6 +25,7 @@
 | 面板主题切换 | `trace-ui/spec.md`(主题能力) | `web/`(调色板/画布变量/持久化) | 基线(change `panel-theme-toggle`,已归档) |
 | JS 运行时 Live 调试 | `js-sdk/spec.md`(Live 能力) | `sdks/node/`(debug.ts/端点/断点持久化) | 基线(change `node-live-debug`,已归档) |
 | JS 运行时副作用沙箱 | `js-sdk/spec.md`(沙箱能力) | `sdks/node/`(fork.ts/interceptor.ts) | 基线(change `node-side-effect-sandbox`,已归档) |
+| JS 运行时导入/推送 | `js-sdk/spec.md`(导入推送能力) | `sdks/node/`(importer.ts/pusher.ts/server.ts) | 基线(change `node-import-push`,已归档) |
 
 ## 显式不纳入 MVP 基线(后续 change 处理)
 
