@@ -75,4 +75,4 @@ jobs:
           python -c "import zipfile, glob; names = zipfile.ZipFile(glob.glob('dist/*.whl')[0]).namelist(); assert 'agent_inspect/panel/index.html' in names, 'wheel must bundle panel'; print('wheel carries panel: OK')"
       - name: npm pack sanity (node sdk bundles panel)
         working-directory: sdks/node
-        run: npm pack --dry-run
+        run: npm ci && npm pack --dry-run
