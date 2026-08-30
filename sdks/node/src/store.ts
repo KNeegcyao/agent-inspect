@@ -2,13 +2,14 @@
 // 存储引擎是实现细节(行为契约与 Python 侧一致);已完成登记即入内存,落盘立即排程。
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
-import type { Branch, DecisionPoint, Lifecycle, Trace } from "./models.js";
+import type { Branch, Breakpoint, DecisionPoint, Lifecycle, Trace } from "./models.js";
 import { newId, now } from "./models.js";
 
 interface StoreData {
   traces: Trace[];
   branches: Branch[];
   points: DecisionPoint[];
+  breakpoints?: Breakpoint[];
 }
 
 export class Store {
@@ -18,9 +19,11 @@ export class Store {
 
   constructor(readonly path: string) {
     if (existsSync(path)) {
-      this.data = JSON.parse(readFileSync(path, "utf-8")) as StoreData;
+      const loaded = JSON.parse(readFileSync(path, "utf-8")) as StoreData;
+      loaded.breakpoints = loaded.breakpoints ?? [];
+      this.data = loaded;
     } else {
-      this.data = { traces: [], branches: [], points: [] };
+      this.data = { traces: [], branches: [], points: [], breakpoints: [] };
       const dir = dirname(path);
       if (dir && dir !== "." && !existsSync(dir)) mkdirSync(dir, { recursive: true });
       this.scheduleSave();
@@ -172,4 +175,24 @@ export class Store {
     }
     return best;
   }
+
+  // ---- breakpoints(Mode C live 调试,跨会话保留) ----
+  addBreakpoint(bp: Breakpoint): void {
+    this.data.breakpoints!.push({ ...bp });
+    this.scheduleSave();
+  }
+
+  removeBreakpoint(traceId: string, bpId: string): void {
+    this.data.breakpoints = this.data.breakpoints!.filter(
+      (b) => !(b.trace_id === traceId && b.id === bpId),
+    );
+    this.scheduleSave();
+  }
+
+  listBreakpoints(traceId: string): Breakpoint[] {
+    return (this.data.breakpoints ?? [])
+      .filter((b) => b.trace_id === traceId)
+      .map((b) => ({ ...b }));
+  }
 }
+

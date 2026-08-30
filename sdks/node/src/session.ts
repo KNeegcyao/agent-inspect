@@ -9,6 +9,7 @@ import { ForkController } from "./fork.js";
 import { Interceptor } from "./interceptor.js";
 import { createHttpServer } from "./server.js";
 import { installOpenAIInterceptor, type Patcher } from "./patchers/openai.js";
+import { DebugController } from "./debug.js";
 import { enterCursor, type Cursor } from "./context.js";
 
 export interface StartOptions {
@@ -24,6 +25,7 @@ export interface StartResult extends Session {}
 export class Session {
   store: Store;
   fork: ForkController;
+  debug: DebugController;
   interceptor: Interceptor;
   url = "";
   port = 0;
@@ -42,10 +44,16 @@ export class Session {
       join(process.env.HOME ?? process.env.USERPROFILE ?? ".", ".agent-inspect", "agent-inspect-node.json");
     this.store = new Store(dbPath);
     this.fork = new ForkController(this.store);
-    this.interceptor = new Interceptor(this.store, this.fork, (event, payload) => {
-      const frame = `event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`;
-      for (const send of this.events) send(frame);
-    });
+    this.debug = new DebugController(this.store, (event, payload) => this.emit(event, payload));
+    this.interceptor = new Interceptor(
+      this.store,
+      this.fork,
+      (event, payload) => {
+        const frame = `event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`;
+        for (const send of this.events) send(frame);
+      },
+      this.debug,
+    );
     this.panelDir = opts.uiDir ?? defaultPanelDir();
     this.server = createHttpServer(this);
     const preferred = opts.port ?? 8765;

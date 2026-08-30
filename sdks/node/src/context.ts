@@ -14,6 +14,7 @@ export class Cursor {
   dryRun: boolean;
   stepIndex = -1;
   lastDpId: string | null = null;
+  liveDebug = false;
 
   constructor(opts: {
     traceId: string;
@@ -22,6 +23,7 @@ export class Cursor {
     replayBranchId?: string | null;
     branchFromStep?: number;
     dryRun?: boolean;
+    liveDebug?: boolean;
   }) {
     this.traceId = opts.traceId;
     this.branchId = opts.branchId;
@@ -29,6 +31,7 @@ export class Cursor {
     this.replayBranchId = opts.replayBranchId ?? null;
     this.branchFromStep = opts.branchFromStep ?? 0;
     this.dryRun = opts.dryRun ?? false;
+    this.liveDebug = opts.liveDebug ?? false;
   }
 
   nextStep(): number {

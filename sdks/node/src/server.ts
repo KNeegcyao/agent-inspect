@@ -86,6 +86,65 @@ async function apiRoute(
     return json(res, 200, { branch, plan });
   }
 
+  // /api/debug/*(Mode C live 调试,与 Python 同契约)
+  if (seg[1] === "debug") {
+    const traceId = seg[2];
+    const t = traceId ? store.getTrace(traceId) : null;
+    const gate = session.debug.gate(traceId) ?? session.debug.ensureGate(traceId);
+    if (seg[3] === "attach" && method === "POST") {
+      if (!t) return json(res, 404, { error: "trace not found" });
+      if (t.lifecycle !== "running") {
+        return json(res, 422, { error: `trace not running (lifecycle=${t.lifecycle})` });
+      }
+      const first = gate.attach();
+      return json(res, 200, { ...(gate.state() as Record<string, unknown>), first });
+    }
+    if (seg[3] === "state" && method === "GET") {
+      return json(res, 200, gate.state());
+    }
+    if (seg[3] === "breakpoints") {
+      if (method === "GET") return json(res, 200, store.listBreakpoints(traceId));
+      if (method === "POST") {
+        const body = await readJson(req);
+        const bp = gate.addBreakpoint({
+          kind: (body["kind"] as string | undefined) ?? null,
+          agentId: (body["agent_id"] as string | undefined) ?? null,
+          condition: (body["condition"] as string | undefined) ?? null,
+        });
+        return json(res, 200, { ...bp });
+      }
+      if (method === "DELETE" && seg[4]) {
+        const ok = gate.removeBreakpoint(seg[4]);
+        return ok
+          ? json(res, 200, { ok: true, breakpoint_id: seg[4] })
+          : json(res, 404, { error: "breakpoint not found" });
+      }
+    }
+    if (seg[3] === "pause" && method === "POST") {
+      gate.pause();
+      return json(res, 200, { ok: true, action: "pause" });
+    }
+    if (seg[3] === "step" && method === "POST") {
+      const body = await readJson(req);
+      const released = gate.step((body["at_step"] as number | undefined) ?? null);
+      return json(res, 200, { ok: true, action: "step", released });
+    }
+    if (seg[3] === "continue" && method === "POST") {
+      const body = await readJson(req);
+      const released = gate.resume((body["at_step"] as number | undefined) ?? null);
+      return json(res, 200, { ok: true, action: "continue", released });
+    }
+    if (seg[3] === "modify" && method === "POST") {
+      const body = await readJson(req);
+      if (!("step" in body) || !("field" in body) || !("value" in body)) {
+        return json(res, 422, { error: "step/field/value required" });
+      }
+      gate.modify(Number(body["step"]), String(body["field"]), body["value"]);
+      return json(res, 200, { ok: true, action: "modify", step: Number(body["step"]) });
+    }
+    return json(res, 404, { error: "not found" });
+  }
+
   // /api/traces/*
   if (seg[1] === "traces") {
     if (!seg[2]) return notFound(res);

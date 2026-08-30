@@ -1,6 +1,7 @@
 // 三态路由(record/replay/fork)+ 决策点登记落盘 + 注入路径补丁。
 // 与 Python 侧 interceptor/base.py 同构:一个引擎,三种模式只是三种游标。
 import { getCursor, enterCursor, Cursor, MODE_FORK, MODE_REPLAY } from "./context.js";
+import type { DebugController } from "./debug.js";
 import type { ForkController, Modification } from "./fork.js";
 import type { DecisionPoint } from "./models.js";
 import { hashOf, newId, now } from "./models.js";
@@ -26,6 +27,7 @@ export class Interceptor {
     private store: Store,
     private fork: ForkController,
     private onEvent?: (event: string, payload: unknown) => void,
+    private debug?: DebugController,
   ) {}
 
   // 无活跃上下文:消费待执行 Fork,否则新建 record trace(进入当前异步上下文)
@@ -45,8 +47,13 @@ export class Interceptor {
       return { cursor, traceId: plan.traceId, branchId: plan.branchId };
     }
     const { trace, branch } = this.store.createTraceWithRoot("agent");
-    const cursor = new Cursor({ traceId: trace.id, branchId: branch.id });
+    const cursor = new Cursor({
+      traceId: trace.id,
+      branchId: branch.id,
+      liveDebug: !!this.debug,
+    });
     enterCursor(cursor);
+    if (this.debug) this.debug.ensureGate(trace.id);
     this.onEvent?.("trace.started", { trace_id: trace.id });
     return { cursor, traceId: trace.id, branchId: branch.id };
   }
@@ -71,12 +78,24 @@ export class Interceptor {
       cause_edge: cursor.lastDpId ? [cursor.lastDpId] : [],
       meta: {},
     };
+    // Mode C live 调试:决策点边界咨询调试门;命中 → 暂停等待指令,放行时应用替换输入
+    let call = opts.call;
+    if (cursor.liveDebug && this.debug) {
+      const mod = await this.debug.consult(dp.trace_id, dp);
+      if (mod) {
+        this.applyInputMod(dp, mod);
+        if (opts.makeModifiedCall) {
+          const mk = opts.makeModifiedCall;
+          call = () => mk(dp.input_context)();
+        }
+      }
+    }
     const start = performance.now();
     let err: unknown = null;
     let native: unknown = null;
     let needsRecord = true;
     try {
-      const r = await this.decide(cursor, step, dp, opts);
+      const r = await this.decide(cursor, step, dp, { ...opts, call });
       native = r.native;
       needsRecord = r.needsRecord;
     } catch (e) {

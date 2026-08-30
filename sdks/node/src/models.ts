@@ -68,3 +68,13 @@ function sortKeysDeep(value: unknown): unknown {
 export function hashOf(obj: unknown): string {
   return "sha256:" + createHash("sha256").update(stableStringify(obj)).digest("hex");
 }
+
+export interface Breakpoint {
+  id: string;
+  trace_id: string;
+  kind: string | null;
+  agent_id: string | null;
+  condition: string | null;
+  enabled: boolean;
+  created_at: number;
+}
