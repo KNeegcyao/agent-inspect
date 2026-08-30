@@ -5,7 +5,7 @@
 [![CI](https://github.com/KNeegcyao/agent-inspect/actions/workflows/ci.yml/badge.svg)](https://github.com/KNeegcyao/agent-inspect/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Status: pre-alpha](https://img.shields.io/badge/status-pre--alpha-orange.svg)](#status)
-[![Spec: 190 scenarios / 76 req](https://img.shields.io/badge/spec-158%20scenarios%20%2F%2063%20req-green.svg)](openspec/)
+[![Spec: 193 scenarios / 77 req](https://img.shields.io/badge/spec-158%20scenarios%20%2F%2063%20req-green.svg)](openspec/)
 
 **Agent-Inspect** is an interactive step-debugger for LLM Agents — not another tracing platform. It brings the Chrome DevTools / `pdb` experience to Agent development: drop in one line, and a local debug panel opens in your browser. You can inspect the full prompt at any decision point, change a prompt or a tool's return value, and fork a new branch to see what the Agent does *after the change* — without rerunning the whole thing.
 
@@ -203,7 +203,7 @@ node sdks/node/examples/quickstart.mjs   # 离线演示:录制 → 面板 Fork �
 - **External trace import/export/push**: import a span-export JSON (OpenInference conventions) as a first-class trace — inspect it and fork it like any self-recorded run; export any trace back to the same format (roundtrip-equivalent); push a chain to any OTLP/HTTP collector endpoint (stdlib-only, zero new deps).
 - **JavaScript / Node SDK** (`sdks/node/`): one-line enable + OpenAI Node SDK instrumentation + record/fork with the same panel and contract (zero runtime dependencies).
 - One-line launch with a local panel; local file storage; zero external backend.
-- Single-page React UI: decision tree, full-prompt inspection, fork interaction, branch diff (side-by-side, field-level), live debug toolbar, trace management (delete with cascade), full-text search over decision points (jump to hit) plus cross-trace global search in the sidebar, per-chain latency/token summary.
+- Single-page React UI: decision tree, full-prompt inspection, fork interaction, branch diff (side-by-side, field-level), live debug toolbar, trace management (delete with cascade), full-text search over decision points (jump to hit) plus cross-trace global search in the sidebar, dark/light theme toggle (persisted, default dark), per-chain latency/token summary.
 
 **Deliberately out (follow-up changes):**
 - TS / Go SDKs; framework auto-instrumentation beyond LangChain/OpenAI.

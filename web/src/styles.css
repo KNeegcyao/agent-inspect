@@ -11,6 +11,32 @@
   --danger: #f87171;
   --ok: #34d399;
   --mono: ui-monospace, 'Cascadia Code', Consolas, monospace;
+  /* 画布绘制色(Canvas 不吃 CSS 变量,绘制时读取) */
+  --canvas-node-bg: #121a2c;
+  --canvas-node-title: #cbd5e1;
+  --canvas-node-text: #e2e8f0;
+  --canvas-node-muted: #64748b;
+  --canvas-edge: #334155;
+}
+
+/* 浅色主题:覆盖界面变量与画布绘制色;徽标/状态强调色保持原值(两主题可读) */
+[data-theme='light'] {
+  --bg: #f3f5f9;
+  --panel: #ffffff;
+  --panel-2: #f7f9fc;
+  --border: #d8e0ec;
+  --text: #1c2536;
+  --muted: #64748b;
+  --accent: #2563eb;
+  --accent-2: #0369a1;
+  --fork: #b45309;
+  --danger: #dc2626;
+  --ok: #059669;
+  --canvas-node-bg: #ffffff;
+  --canvas-node-title: #1c2536;
+  --canvas-node-text: #334155;
+  --canvas-node-muted: #94a3b8;
+  --canvas-edge: #cbd5e1;
 }
 
 * {
@@ -47,6 +73,19 @@ body {
   padding: 12px;
   gap: 10px;
   overflow-y: auto;
+}
+
+.theme-toggle {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 11px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+.theme-toggle:hover {
+  border-color: var(--accent);
 }
 
 .app-title {

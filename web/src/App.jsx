@@ -80,6 +80,17 @@ export default function App() {
   const [ownPoints, setOwnPoints] = useState({}) // branchId -> points[]
   const [selectedId, setSelectedId] = useState(null)
   const [conn, setConn] = useState('connecting')
+  // 面板主题(spec trace-ui.面板主题切换):localStorage 持久化,默认深色
+  const [theme, setTheme] = useState(() => localStorage.getItem('ai-theme') || 'dark')
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme
+    localStorage.setItem('ai-theme', theme)
+    window.dispatchEvent(new Event('ai-theme'))
+  }, [theme])
+  const onToggleTheme = useCallback(
+    () => setTheme((t) => (t === 'dark' ? 'light' : 'dark')),
+    []
+  )
   const [error, setError] = useState(null)
   const [debugState, setDebugState] = useState(null) // {attached, paused_at, waiting, breakpoints}
   const [pausedPayload, setPausedPayload] = useState(null) // trace.paused 载荷(完整输入)
@@ -409,6 +420,13 @@ export default function App() {
       <aside className="sidebar">
         <header className="app-title">
           <h1>Agent-Inspect</h1>
+          <button
+            className="theme-toggle"
+            title="切换深色/浅色主题"
+            onClick={onToggleTheme}
+          >
+            {theme === 'dark' ? '☀️ 浅色' : '🌙 深色'}
+          </button>
           <span className={`conn conn-${conn}`}>
             {conn === 'open' ? '实时' : conn === 'error' ? '已断开' : '连接中'}
           </span>

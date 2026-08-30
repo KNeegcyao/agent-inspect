@@ -10,6 +10,21 @@ const PAD = 50
 
 const KIND_COLORS = { llm: '#3b82f6', tool: '#f59e0b', default: '#8b5cf6' }
 
+// 画布绘制色:从 CSS 变量读取(随主题切换),读取失败兜底深色原值
+function themeColors() {
+  const css = getComputedStyle(document.documentElement)
+  const v = (name, fb) => css.getPropertyValue(name).trim() || fb
+  return {
+    nodeBg: v('--canvas-node-bg', '#121a2c'),
+    nodeTitle: v('--canvas-node-title', '#cbd5e1'),
+    nodeText: v('--canvas-node-text', '#e2e8f0'),
+    nodeMuted: v('--canvas-node-muted', '#64748b'),
+    edge: v('--canvas-edge', '#334155'),
+    error: '#f87171',
+    selected: '#7dd3fc',
+  }
+}
+
 // ---- 布局:D3-hierarchy tree(按 cause_edge 组树),Canvas 渲染节点 ----
 // 深度纵向(步骤自上而下),兄弟分叉横向展开——线性链为垂直步骤列表。
 function computeLayout(points) {
@@ -91,9 +106,9 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.closePath()
 }
 
-function drawEdges(ctx, edges) {
+function drawEdges(ctx, edges, colors) {
   ctx.save()
-  ctx.strokeStyle = '#334155'
+  ctx.strokeStyle = colors.edge
   ctx.lineWidth = 1.2
   for (const e of edges) {
     ctx.beginPath()
@@ -111,7 +126,7 @@ const DIFF_COLORS = {
   only_right: '#60a5fa',
 }
 
-function drawNode(ctx, node, { selected, diffStatus }) {
+function drawNode(ctx, node, { selected, diffStatus, colors }) {
   const r = node.rect
   const color = KIND_COLORS[node.kind] || KIND_COLORS.default
   const hasErr = node.meta && node.meta.error
@@ -120,15 +135,15 @@ function drawNode(ctx, node, { selected, diffStatus }) {
   ctx.save()
   ctx.globalAlpha = node.inherited ? 0.5 : 1
 
-  ctx.fillStyle = '#121a2c'
+  ctx.fillStyle = colors.nodeBg
   roundRect(ctx, r.x, r.y, r.w, r.h, 8)
   ctx.fill()
 
   ctx.lineWidth = selected ? 2.5 : 1
   ctx.strokeStyle = hasErr
-    ? '#f87171'
+    ? colors.error
     : selected
-      ? '#7dd3fc'
+      ? colors.selected
       : statusColor || color
   ctx.setLineDash(node.inherited ? [4, 4] : [])
   roundRect(ctx, r.x, r.y, r.w, r.h, 8)
@@ -143,7 +158,7 @@ function drawNode(ctx, node, { selected, diffStatus }) {
   ctx.textBaseline = 'middle'
   ctx.fillText(kindLabel(node.kind), r.x + 12, r.y + 17)
 
-  ctx.fillStyle = '#cbd5e1'
+  ctx.fillStyle = colors.nodeTitle
   ctx.font = '12px ui-monospace, Consolas, monospace'
   const title = `#${node.step_index}${node.inherited ? ' ↺' : ''} · ${node.agent_id || ''}`
   ctx.fillText(title, r.x + 68, r.y + 17)
@@ -168,6 +183,14 @@ export default function ChainCanvas({
   const layoutRef = useRef(layout)
   layoutRef.current = layout
 
+  // 主题切换 → 强制重绘(绘制色来自 CSS 变量)
+  const [themeTick, setThemeTick] = useState(0)
+  useEffect(() => {
+    const onTheme = () => setThemeTick((t) => t + 1)
+    window.addEventListener('ai-theme', onTheme)
+    return () => window.removeEventListener('ai-theme', onTheme)
+  }, [])
+
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
@@ -179,15 +202,17 @@ export default function ChainCanvas({
     const ctx = canvas.getContext('2d')
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
     ctx.clearRect(0, 0, layout.width, layout.height)
-    drawEdges(ctx, layout.edges)
+    const colors = themeColors()
+    drawEdges(ctx, layout.edges, colors)
     for (const node of layout.nodes) {
       drawNode(ctx, node, {
         selected: node.id === selectedId,
         diffStatus,
+        colors,
         paused: pausedStep != null && node.step_index === pausedStep,
       })
     }
-  }, [layout, selectedId, diffStatus, pausedStep])
+  }, [layout, selectedId, diffStatus, pausedStep, themeTick])
 
   const hitTest = (e) => {
     const canvas = canvasRef.current
