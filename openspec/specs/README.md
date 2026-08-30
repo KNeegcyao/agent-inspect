@@ -7,6 +7,7 @@
 | 能力 | 路径 | 对应源码层(预期) | 状态 |
 |------|------|-----------|------|
 | 决策点拦截与自动插桩 | `interception/spec.md` | `sdk/interceptor/` | 基线(change `add-agent-inspect-mvp`,已归档) |
+| 流式调用插桩 | `interception/spec.md`(流式能力) | `interceptor/streaming.py`、`openai_patcher.py` | 基线(change `python-streaming-instrumentation`,已归档) |
 | 决策点记录与存储 | `recording/spec.md` | `sdk/recorder/`、`server/store/` | 基线(已归档) |
 | Counterfactual Fork | `fork/spec.md` | `sdk/interceptor/`、`server/session/` | 基线(已归档) |
 | 本地运行时与面板自启 | `local-runtime/spec.md` | `server/`、`sdk/controller/` | 基线(已归档) |

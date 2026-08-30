@@ -11,6 +11,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 from typing import Any, Callable, Optional
 
+from . import streaming
 from ..recorder.serializer import Serializer, _jsonable
 
 try:  # 允许在未装 openai 的环境导入本模块而不报错
@@ -110,6 +111,17 @@ class OpenAIPatcher:
         orig_create = Completions.create
 
         def _create(self, **kwargs):
+            if kwargs.get("stream"):
+                # 流式:透传 + 旁路累积,流耗尽时登记(spec interception.流式调用插桩)
+                return streaming.route_stream(
+                    interceptor,
+                    kind="llm",
+                    agent_id=_model_from(kwargs),
+                    input_context=_input_context(kwargs),
+                    start_call=lambda: orig_create(self, **kwargs),
+                    reconstruct=_reconstruct_response,
+                    make_modified_call=_mk_create_call(orig_create, self),
+                )
             return interceptor.sroute(
                 kind="llm",
                 agent_id=_model_from(kwargs),
@@ -128,6 +140,16 @@ class OpenAIPatcher:
         orig_acreate = AsyncCompletions.create
 
         async def _acreate(self, **kwargs):
+            if kwargs.get("stream"):
+                return await streaming.aroute_stream(
+                    interceptor,
+                    kind="llm",
+                    agent_id=_model_from(kwargs),
+                    input_context=_input_context(kwargs),
+                    start_call=lambda: orig_acreate(self, **kwargs),
+                    reconstruct=_reconstruct_response,
+                    make_modified_call=_mk_create_call(orig_acreate, self),
+                )
             return await interceptor.aroute(
                 kind="llm",
                 agent_id=_model_from(kwargs),
