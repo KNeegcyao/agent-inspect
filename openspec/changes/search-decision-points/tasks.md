@@ -2,13 +2,13 @@
 
 ## 1. OpenSpec 文档
 
-- [ ] 1.1 `proposal.md` / `design.md`:搜索的 why / 匹配语义 / 范围
-- [ ] 1.2 `specs/trace-search/spec.md` delta:2 requirement(内容搜索 / 搜索入口)共 5 场景
+- [x] 1.1 `proposal.md` / `design.md`:搜索的 why / 匹配语义 / 范围
+- [x] 1.2 `specs/trace-search/spec.md` delta:2 requirement(内容搜索 / 搜索入口)共 5 场景
 
 ## 2. 后端
 
-- [ ] 2.1 新建 `agent_inspect/search.py`:`search_trace`(全分支遍历、解析后序列化匹配、snippet 合成、排序);单测(输入/输出命中、大小写、无命中、排序、截断压行)
-- [ ] 2.2 `GET /api/traces/{trace_id}/search?q=`:200 / 404 / 422
+- [x] 2.1 新建 `agent_inspect/search.py`:`search_trace`(全分支遍历、解析后序列化匹配、snippet 合成、排序);单测(输入/输出命中、大小写、无命中、排序、截断压行)
+- [x] 2.2 `GET /api/traces/{trace_id}/search?q=`:200 / 404 / 422
 
 ## 3. UI
 
@@ -17,7 +17,7 @@
 
 ## 4. 测试与回归
 
-- [ ] 4.1 e2e:搜索命中(大小写不敏感标注 output)/ 404 / 422
+- [x] 4.1 e2e:搜索命中(大小写不敏感标注 output)/ 404 / 422
 - [ ] 4.2 全量 pytest 通过,零回归;`npm run build` 通过
 
 ## 5. 验证与发布

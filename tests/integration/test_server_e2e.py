@@ -771,6 +771,33 @@ def test_trace_import_e2e(session):
     assert len(_traces(base)) == before + 1
 
 
+def test_trace_search_e2e(session):
+    """决策点搜索:大小写不敏感命中输出、标注来源;404 / 422(spec trace-search)。"""
+    base = session.url
+    with session.trace() as tid:
+        run_agent(session.interceptor, 2, FakeLLM(["alpha plan", "beta done"]))
+
+    # 大小写不敏感命中 step1 输出
+    st, res = _get(base, f"/api/traces/{tid}/search?q=BETA")
+    assert st == 200
+    assert res["query"] == "BETA"
+    assert len(res["matches"]) == 1
+    m = res["matches"][0]
+    assert m["step_index"] == 1 and m["matched_in"] == "output"
+    assert "beta" in m["snippet"].lower()
+    assert m["branch_id"] and m["dp_id"]
+
+    # 无命中空集
+    st, res = _get(base, f"/api/traces/{tid}/search?q=never-there")
+    assert st == 200 and res["matches"] == []
+
+    # 异常路径:trace 不存在 404;缺 q 422
+    st, body = _get_error(base, "/api/traces/tr_none/search?q=x")
+    assert st == 404 and body.get("error")
+    st, body = _get_error(base, f"/api/traces/{tid}/search")
+    assert st == 422 and body.get("error")
+
+
 def test_trace_delete_e2e(session):
     """删除 trace:级联清理 + 隔离(其它 trace 完好)+ 重复删除 404(spec recording.trace 删除管理)。"""
     base = session.url

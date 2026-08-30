@@ -21,6 +21,7 @@ from ..adopt import preview_adopt
 from ..diff import diff_branches
 from ..exporter import export_trace
 from ..fork import Modification
+from ..search import search_trace
 from ..importer import TraceImportError, import_trace
 from ..pusher import PushError, push_trace
 
@@ -140,6 +141,16 @@ def create_app(session) -> FastAPI:
             "decision_points": res.decision_points,
             "skipped": res.skipped,
         }
+
+    @app.get("/api/traces/{trace_id}/search")
+    def search_trace_route(trace_id: str, q: str = ""):
+        """按内容搜索 trace 全分支决策点(spec trace-search);只读。"""
+        if session.store.get_trace(trace_id) is None:
+            return JSONResponse({"error": "trace not found"}, status_code=404)
+        if not q.strip():
+            return JSONResponse({"error": "query parameter q is required"}, status_code=422)
+        matches = search_trace(session.store, session.recorder, trace_id, q)
+        return {"trace_id": trace_id, "query": q, "matches": matches}
 
     @app.delete("/api/traces/{trace_id}")
     def delete_trace_route(trace_id: str):
