@@ -8,6 +8,7 @@ import { Store } from "../src/store.js";
 import { ForkController } from "../src/fork.js";
 import { Interceptor } from "../src/interceptor.js";
 import { runWithCursor } from "../src/context.js";
+export { runWithCursor };
 
 export interface Env {
   store: Store;

@@ -15,11 +15,16 @@ export interface ForkPlan {
   branchFromStep: number;
   dryRun: boolean;
   modifications: Modification[];
+  sandbox: Record<string, string> | null;
 }
 
 export class ForkError extends Error {}
 
 export const BIG_STEP = 2 ** 31;
+
+// 副作用沙箱:按决策点类型配置执行策略(spec js-sdk.副作用沙箱)
+export const SANDBOX_KINDS = ["llm", "tool"];
+export const SANDBOX_POLICIES = ["allow", "dry-run", "block"];
 
 export class ForkController {
   private pending: ForkPlan[] = [];
@@ -34,8 +39,18 @@ export class ForkController {
     modifications?: Modification[];
     dryRun?: boolean;
     note?: string | null;
+    sandbox?: Record<string, string> | null;
   }): Promise<{ branch: Branch; plan: ForkPlan }> {
     const { traceId, fromBranch, fromStep } = opts;
+    const sandbox = opts.sandbox ?? null;
+    if (sandbox) {
+      for (const [kind, policy] of Object.entries(sandbox)) {
+        if (!SANDBOX_KINDS.includes(kind)) throw new ForkError(`invalid sandbox kind: ${kind}`);
+        if (!SANDBOX_POLICIES.includes(policy)) {
+          throw new ForkError(`invalid sandbox policy ${policy} for kind ${kind}`);
+        }
+      }
+    }
     if (this.store.countDecisionPoints(traceId) === 0) {
       throw new ForkError(
         `cannot fork empty trace ${traceId}: no decision points recorded yet`,
@@ -70,6 +85,7 @@ export class ForkController {
       branchFromStep: fromStep,
       dryRun: opts.dryRun ?? false,
       modifications,
+      sandbox,
     };
     this.pending.push(plan);
     return { branch, plan };

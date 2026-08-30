@@ -12,6 +12,7 @@ export class Cursor {
   replayBranchId: string | null;
   branchFromStep: number;
   dryRun: boolean;
+  sandbox: Record<string, string> | null = null;
   stepIndex = -1;
   lastDpId: string | null = null;
   liveDebug = false;
@@ -23,6 +24,7 @@ export class Cursor {
     replayBranchId?: string | null;
     branchFromStep?: number;
     dryRun?: boolean;
+    sandbox?: Record<string, string> | null;
     liveDebug?: boolean;
   }) {
     this.traceId = opts.traceId;
@@ -32,6 +34,7 @@ export class Cursor {
     this.branchFromStep = opts.branchFromStep ?? 0;
     this.dryRun = opts.dryRun ?? false;
     this.liveDebug = opts.liveDebug ?? false;
+    this.sandbox = opts.sandbox ?? null;
   }
 
   nextStep(): number {

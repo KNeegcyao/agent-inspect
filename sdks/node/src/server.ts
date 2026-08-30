@@ -82,6 +82,7 @@ async function apiRoute(
       modifications: (body["modifications"] as Modification[] | undefined) ?? [],
       dryRun: Boolean(body["dry_run"]),
       note: (body["note"] as string | undefined) ?? null,
+      sandbox: (body["sandbox"] as Record<string, string> | undefined) ?? null,
     });
     return json(res, 200, { branch, plan });
   }

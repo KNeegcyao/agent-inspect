@@ -41,6 +41,7 @@ export class Interceptor {
         replayBranchId: plan.originBranch,
         branchFromStep: plan.branchFromStep,
         dryRun: plan.dryRun,
+        sandbox: plan.sandbox,
       });
       cursor.lastDpId = this.prefixLastDp(plan.traceId, plan.originBranch, plan.branchFromStep);
       enterCursor(cursor);
@@ -144,9 +145,25 @@ export class Interceptor {
       if (cursor.dryRun) {
         return { native: opts.reconstruct(null), needsRecord: true }; // 只读预览:不真调
       }
+      // 副作用沙箱:命中 kind 的"将要真调"决策点按策略拦截并打标记
+      const policy = this.sandboxPolicy(cursor, dp);
+      if (policy) {
+        dp.meta["sandbox"] = policy;
+        return { native: opts.reconstruct(null), needsRecord: true };
+      }
       return { native: await opts.call(), needsRecord: true };
     }
     return { native: await opts.call(), needsRecord: true };
+  }
+
+  // 副作用沙箱闸门:命中返回 "dry-run"|"blocked",否则 null(照常真调)
+  private sandboxPolicy(cursor: Cursor, dp: DecisionPoint): string | null {
+    const sb = cursor.sandbox;
+    if (!sb) return null;
+    const policy = sb[dp.kind];
+    if (policy === "dry-run") return "dry-run";
+    if (policy === "block") return "blocked";
+    return null;
   }
 
   // 沿分支父链向上找已记录输出(嵌套 Fork 前缀复用父分支记录)
