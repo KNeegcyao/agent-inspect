@@ -95,6 +95,30 @@ def create_app(session) -> FastAPI:
         return [session.recorder.serializer.resolve_dp(session.store, p, session.recorder.context_snap) for p in points]
 
     # ---- traces ----
+    @app.get("/api/search")
+    def global_search_route(q: str = ""):
+        """跨 trace 全局搜索决策点(spec trace-search.跨 trace 全局搜索);只读。"""
+        if not q.strip():
+            return JSONResponse({"error": "query parameter q is required"}, status_code=422)
+        results = []
+        total = 0
+        for t in session.store.list_traces():
+            matches = search_trace(session.store, session.recorder, t.id, q)
+            if not matches:
+                continue
+            total += len(matches)
+            results.append(
+                {
+                    "trace_id": t.id,
+                    "trace_name": t.agent_name or t.id,
+                    "lifecycle": t.lifecycle,
+                    "started_at": t.started_at,
+                    "match_count": len(matches),
+                    "matches": matches[:50],  # 每组截前 50,合计完整
+                }
+            )
+        return {"query": q, "total_matches": total, "results": results}
+
     @app.get("/api/traces")
     def list_traces(lifecycle: Optional[str] = None):
         imported = session.store.imported_trace_ids()

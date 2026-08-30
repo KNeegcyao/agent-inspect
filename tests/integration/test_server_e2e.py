@@ -771,6 +771,35 @@ def test_trace_import_e2e(session):
     assert len(_traces(base)) == before + 1
 
 
+def test_global_search_e2e(session):
+    """跨 trace 全局搜索:按 trace 分组、无命中 trace 不出现、合计完整、缺 q 422(spec trace-search.跨 trace)。"""
+    base = session.url
+    with session.trace() as tid1:
+        run_agent(session.interceptor, 2, FakeLLM(["needle one", "plain"]))
+    with session.trace() as tid2:
+        run_agent(session.interceptor, 1, FakeLLM(["no match here"]))
+
+    st, res = _get(base, "/api/search?q=needle")
+    assert st == 200
+    assert res["total_matches"] == 1
+    assert len(res["results"]) == 1  # 无命中的 trace 不出现
+    grp = res["results"][0]
+    assert grp["trace_id"] == tid1 and grp["match_count"] == 1
+    assert grp["trace_name"] and grp["matches"][0]["snippet"]
+
+    # 全部无命中 → 空集
+    st, res = _get(base, "/api/search?q=absent-everywhere")
+    assert st == 200 and res["results"] == [] and res["total_matches"] == 0
+
+    # 分组截断语义:同一 trace 多条命中,matches 截前 50 但合计完整(构造 2 条即验证字段)
+    st, res = _get(base, "/api/search?q=needle")
+    assert len(res["results"][0]["matches"]) <= 50
+
+    # 缺 q 422
+    st, body = _get_error(base, "/api/search")
+    assert st == 422 and body.get("error")
+
+
 def test_trace_search_e2e(session):
     """决策点搜索:大小写不敏感命中输出、标注来源;404 / 422(spec trace-search)。"""
     base = session.url

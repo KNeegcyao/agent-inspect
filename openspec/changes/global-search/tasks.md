@@ -2,12 +2,12 @@
 
 ## 1. OpenSpec 文档
 
-- [ ] 1.1 `proposal.md` / `design.md`:全局搜索的 why / 分组语义 / 每组截断策略
-- [ ] 1.2 `specs/trace-search/spec.md` delta:「跨 trace 全局搜索」+「面板全局搜索入口」2 requirement 共 5 场景
+- [x] 1.1 `proposal.md` / `design.md`:全局搜索的 why / 分组语义 / 每组截断策略
+- [x] 1.2 `specs/trace-search/spec.md` delta:「跨 trace 全局搜索」+「面板全局搜索入口」2 requirement 共 5 场景
 
 ## 2. 后端
 
-- [ ] 2.1 `GET /api/search?q=`:遍历全部 trace 分组检索(每组截前 50、合计完整);缺 q 422;e2e
+- [x] 2.1 `GET /api/search?q=`:遍历全部 trace 分组检索(每组截前 50、合计完整);缺 q 422;e2e
 
 ## 3. UI
 
