@@ -11,6 +11,7 @@ import os
 import socket
 import sys
 import threading
+import time
 import webbrowser
 from contextlib import contextmanager
 from pathlib import Path
@@ -112,6 +113,13 @@ class Session:
             target=self._server.run, daemon=True, name="agent-inspect-server"
         )
         self._thread.start()
+        # 就绪等待:线程已启动 ≠ 端口已可接受连接;不等待的话启用后第一个请求会被拒
+        # (Linux CI 上线程调度更慢,必现;对真实用户同样存在)。uvicorn 在绑定端口后才置 started。
+        deadline = time.time() + 5
+        while not self._server.started:
+            if time.time() > deadline:
+                raise RuntimeError("agent-inspect server failed to start within 5s")
+            time.sleep(0.01)
 
     def _open_browser(self) -> None:
         """自动开浏览器;无图形/无浏览器环境静默降级为打印 URL。"""
