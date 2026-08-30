@@ -15,7 +15,9 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "tsc -p tsconfig.json && node --test dist/tests/*.test.js"
+    "test": "tsc -p tsconfig.json && node --test dist/tests/*.test.js",
+    "copy-panel": "node -e \"const fs=require('fs'); fs.cpSync('../../web/dist','panel',{recursive:true}); console.log('[copy-panel] panel/ ready')\"",
+    "prepack": "npm run build && npm run copy-panel"
   },
   "devDependencies": {
     "@types/node": "^26.4.0",

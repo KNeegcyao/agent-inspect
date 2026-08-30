@@ -35,9 +35,12 @@ DEFAULT_DB = Path.home() / ".agent-inspect" / "agent-inspect.db"
 
 
 def _default_ui_dir() -> Optional[Path]:
-    """构建好的 React UI 目录(web/dist);不存在则用内嵌占位页。"""
-    d = Path(__file__).resolve().parent.parent / "web" / "dist"
-    return d if (d / "index.html").is_file() else None
+    """构建好的 React UI 目录:优先包内打包面板(pip 安装形态),再回退仓库 web/dist(开发形态);都没有则内嵌占位页。"""
+    bundled = Path(__file__).resolve().parent / "panel"
+    if (bundled / "index.html").is_file():
+        return bundled
+    repo = Path(__file__).resolve().parent.parent / "web" / "dist"
+    return repo if (repo / "index.html").is_file() else None
 
 
 class Session:

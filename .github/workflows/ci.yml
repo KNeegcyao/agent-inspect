@@ -51,3 +51,25 @@ jobs:
       - name: Build panel
         working-directory: web
         run: npm ci && npm run build
+
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Build wheel with bundled panel
+        run: |
+          python -m pip install build
+          python scripts/build_panel.py
+          python -m build --wheel
+      - name: Sanity-check wheel contents
+        run: |
+          python -c "import zipfile, glob; names = zipfile.ZipFile(glob.glob('dist/*.whl')[0]).namelist(); assert 'agent_inspect/panel/index.html' in names, 'wheel must bundle panel'; print('wheel carries panel: OK")
+      - name: npm pack sanity (node sdk bundles panel)
+        working-directory: sdks/node
+        run: npm pack --dry-run

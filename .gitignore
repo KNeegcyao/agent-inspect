@@ -77,3 +77,7 @@ agent_inspect_data/
 
 # NOTE: openspec/, docs/, README.md, CLAUDE.md, CONTRIBUTING.md, LICENSE,
 # docs/architecture.md etc. are intentionally NOT ignored — they are the product.
+
+# 打包面板产物(scripts/build_panel.py 生成)
+agent_inspect/panel/
+sdks/node/panel/

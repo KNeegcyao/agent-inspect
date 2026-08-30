@@ -30,6 +30,9 @@ dev = [
 [tool.setuptools.packages.find]
 include = ["agent_inspect*"]
 
+[tool.setuptools.package-data]
+agent_inspect = ["panel/**/*"]
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
