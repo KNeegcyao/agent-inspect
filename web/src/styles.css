@@ -244,6 +244,7 @@ body {
 
 /* ---- 中间:链路画布 ---- */
 .main {
+  position: relative;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1139,4 +1140,91 @@ body {
 .diff-none {
   color: var(--muted);
   font-style: italic;
+}
+
+/* ---- 决策点搜索(spec trace-search)---- */
+.search-pick input {
+  width: 180px;
+}
+.search-clear {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 14px;
+  cursor: pointer;
+  margin-left: 4px;
+}
+.search-results {
+  position: absolute;
+  z-index: 30;
+  left: 16px;
+  right: 16px;
+  top: 96px;
+  max-height: 46vh;
+  overflow-y: auto;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.search-hit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-align: left;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  color: var(--text);
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.search-hit:hover {
+  border-color: var(--accent);
+}
+.search-kind {
+  flex: none;
+  padding: 0 6px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+.search-kind.kind-llm {
+  color: #93c5fd;
+  background: rgba(59, 130, 246, 0.15);
+}
+.search-kind.kind-tool {
+  color: #fcd34d;
+  background: rgba(245, 158, 11, 0.15);
+}
+.search-branch {
+  color: var(--muted);
+  flex: none;
+}
+.search-where {
+  flex: none;
+  font-size: 11px;
+  border-radius: 4px;
+  padding: 0 5px;
+}
+.search-where.where-input {
+  color: var(--accent-2);
+  border: 1px solid var(--accent-2);
+}
+.search-where.where-output {
+  color: var(--ok);
+  border: 1px solid var(--ok);
+}
+.search-snippet {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.search-snippet mark {
+  background: rgba(245, 158, 11, 0.35);
+  color: inherit;
 }

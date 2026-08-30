@@ -35,6 +35,19 @@ function OriginBadge({ branch }) {
   )
 }
 
+// 搜索片段:命中子串高亮(大小写不敏感)
+function Snippet({ text, q }) {
+  const i = q ? text.toLowerCase().indexOf(q.toLowerCase()) : -1
+  if (i < 0) return <span className="search-snippet">{text}</span>
+  return (
+    <span className="search-snippet">
+      {text.slice(0, i)}
+      <mark>{text.slice(i, i + q.length)}</mark>
+      {text.slice(i + q.length)}
+    </span>
+  )
+}
+
 function shortId(id) {
   return id ? id.slice(-8) : ''
 }
@@ -149,6 +162,33 @@ export default function App() {
       }
     },
     [loadTraces, selectTrace]
+  )
+
+  // ---- 决策点内容搜索(spec trace-search):防抖查询 → 结果浮层 → 点击定位 ----
+  const [searchQ, setSearchQ] = useState('')
+  const [searchHits, setSearchHits] = useState(null) // matches[] | null
+  useEffect(() => {
+    const id = traceDataRef.current?.trace?.id
+    const q = searchQ.trim()
+    if (!id || !q) {
+      setSearchHits(null)
+      return undefined
+    }
+    const t = setTimeout(() => {
+      api
+        .searchTrace(id, q)
+        .then((r) => setSearchHits(r.matches))
+        .catch(() => setSearchHits(null))
+    }, 300)
+    return () => clearTimeout(t)
+  }, [searchQ, traceData?.trace?.id])
+  const jumpToMatch = useCallback(
+    (m) => {
+      if (m.branch_id !== activeBranchId) setActiveBranchId(m.branch_id)
+      setSelectedId(m.dp_id)
+      setSearchHits(null)
+    },
+    [activeBranchId]
   )
 
   // ---- 删除 trace(spec recording.trace 删除管理):confirm → 删除 → 刷新;删当前选中回空态 ----
@@ -493,6 +533,32 @@ export default function App() {
                   </span>
                 )}
               </div>
+              <div className="branch-pick search-pick">
+                <label>搜索</label>
+                <input
+                  value={searchQ}
+                  placeholder="搜索决策点内容…"
+                  onChange={(e) => setSearchQ(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Escape') {
+                      setSearchQ('')
+                      setSearchHits(null)
+                    }
+                  }}
+                />
+                {searchQ && (
+                  <button
+                    className="search-clear"
+                    title="清空"
+                    onClick={() => {
+                      setSearchQ('')
+                      setSearchHits(null)
+                    }}
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
               <div className="toolbar-note">
                 {activeBranch?.note && <span>备注:{activeBranch.note}</span>}
               </div>
@@ -510,6 +576,30 @@ export default function App() {
               />
             </div>
 
+            {searchHits && (
+              <div className="search-results">
+                {searchHits.length === 0 ? (
+                  <div className="empty-hint">无命中</div>
+                ) : (
+                  searchHits.map((m, i) => (
+                    <button
+                      key={`${m.branch_id}-${m.step_index}-${m.matched_in}-${i}`}
+                      className="search-hit"
+                      onClick={() => jumpToMatch(m)}
+                    >
+                      <span className={`search-kind kind-${m.kind}`}>
+                        {m.kind === 'tool' ? '工具' : 'LLM'} #{m.step_index}
+                      </span>
+                      <span className="search-branch">{shortId(m.branch_id)}</span>
+                      <span className={`search-where where-${m.matched_in}`}>
+                        {m.matched_in === 'input' ? '输入' : '输出'}
+                      </span>
+                      <Snippet text={m.snippet} q={searchQ.trim()} />
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
             <div className={`canvas-area ${compareChain.length ? 'diff-mode' : ''}`}>
               {activeChain.length === 0 ? (
                 <div className="empty-state">

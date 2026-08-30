@@ -60,6 +60,11 @@ export const api = {
       body: JSON.stringify(payload),
     }).then(parse)
   },
+  searchTrace(traceId, q) {
+    return fetch(
+      `/api/traces/${encodeURIComponent(traceId)}/search?q=${encodeURIComponent(q)}`
+    ).then(parse)
+  },
   deleteTrace(traceId) {
     return fetch(`/api/traces/${encodeURIComponent(traceId)}`, {
       method: 'DELETE',
