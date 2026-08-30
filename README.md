@@ -203,7 +203,7 @@ node sdks/node/examples/quickstart.mjs   # 离线演示:录制 → 面板 Fork �
 - **External trace import/export/push**: import a span-export JSON (OpenInference conventions) as a first-class trace — inspect it and fork it like any self-recorded run; export any trace back to the same format (roundtrip-equivalent); push a chain to any OTLP/HTTP collector endpoint (stdlib-only, zero new deps).
 - **JavaScript / Node SDK** (`sdks/node/`): one-line enable + OpenAI Node SDK instrumentation + record/fork with the same panel and contract (zero runtime dependencies).
 - One-line launch with a local panel; local file storage; zero external backend.
-- Single-page React UI: decision tree, full-prompt inspection, fork interaction, branch diff (side-by-side, field-level), live debug toolbar, trace management (delete with cascade), full-text search over decision points (jump to hit).
+- Single-page React UI: decision tree, full-prompt inspection, fork interaction, branch diff (side-by-side, field-level), live debug toolbar, trace management (delete with cascade), full-text search over decision points (jump to hit), per-chain latency/token summary.
 
 **Deliberately out (follow-up changes):**
 - TS / Go SDKs; framework auto-instrumentation beyond LangChain/OpenAI.

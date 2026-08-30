@@ -7,6 +7,7 @@ import {
   kindLabel,
   lifecycleLabel,
   originLabel,
+  summarizeChain,
 } from './chain.js'
 import BranchDiffView from './components/BranchDiffView.jsx'
 import ChainCanvas from './components/ChainCanvas.jsx'
@@ -309,6 +310,9 @@ export default function App() {
 
   const activeBranch = activeBranchId ? branchesById[activeBranchId] : null
 
+  // 运行统计摘要(spec trace-ui.运行统计摘要):对当前主分支链路聚合
+  const chainStats = useMemo(() => summarizeChain(activeChain), [activeChain])
+
   // 暂停点高亮:优先实时载荷,其次轮询状态
   const pausedStep =
     pausedPayload?.step_index ?? debugState?.paused_at ?? null
@@ -454,6 +458,16 @@ export default function App() {
         ) : (
           <>
             <div className="trace-rel-bar">
+              {chainStats && chainStats.latencyMs != null && (
+                <span className="rel-chip" title="当前链路耗时合计">
+                  Σ 耗时 {chainStats.latencyMs >= 1000 ? `${(chainStats.latencyMs / 1000).toFixed(2)}s` : `${Math.round(chainStats.latencyMs)}ms`}
+                </span>
+              )}
+              {chainStats && chainStats.tokens != null && (
+                <span className="rel-chip" title="当前链路 token 用量合计">
+                  Σ {chainStats.tokens.toLocaleString()} tokens
+                </span>
+              )}
               <button
                 className="rel-chip"
                 title="导出该 trace 决策链为 span 导出 JSON"

@@ -74,3 +74,26 @@ export function fmtLatency(meta) {
   if (ms == null) return ''
   return ms >= 1000 ? `${(ms / 1000).toFixed(2)}s` : `${Math.round(ms)}ms`
 }
+
+
+// 链路统计摘要:耗时合计 + token 合计(usage 优先,meta tokens 回退)。
+// 耗时与 token 各自独立判定"有数据";无任何统计返回 null。
+export function summarizeChain(points) {
+  let latencyMs = null
+  let tokens = null
+  for (const p of points) {
+    const lat = p.meta && p.meta.latency_ms
+    if (typeof lat === 'number') latencyMs = (latencyMs ?? 0) + lat
+    const usage = p.output && p.output.usage && p.output.usage.total_tokens
+    const metaIn = p.meta && p.meta.tokens_in
+    const metaOut = p.meta && p.meta.tokens_out
+    let t = null
+    if (typeof usage === 'number') t = usage
+    else if (typeof metaIn === 'number' || typeof metaOut === 'number') {
+      t = (metaIn ?? 0) + (metaOut ?? 0)
+    }
+    if (t != null) tokens = (tokens ?? 0) + t
+  }
+  if (latencyMs == null && tokens == null) return null
+  return { latencyMs, tokens }
+}
