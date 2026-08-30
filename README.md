@@ -2,6 +2,7 @@
 
 > The DevTools for AI Agents. Pause. Step. Fork a branch and see *"what if I changed this one decision?"*
 
+[![CI](https://github.com/KNeegcyao/agent-inspect/actions/workflows/ci.yml/badge.svg)](https://github.com/KNeegcyao/agent-inspect/actions/workflows/ci.yml)
 [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Status: pre-alpha](https://img.shields.io/badge/status-pre--alpha-orange.svg)](#status)
 [![Spec: 174 scenarios / 70 req](https://img.shields.io/badge/spec-158%20scenarios%20%2F%2063%20req-green.svg)](openspec/)
