@@ -165,6 +165,32 @@ export default function App() {
     [loadTraces, selectTrace]
   )
 
+  // ---- 跨 trace 全局搜索(spec trace-search.跨 trace):侧栏输入 → 分组命中 → 直达 ----
+  const [globalQ, setGlobalQ] = useState('')
+  const [globalResults, setGlobalResults] = useState(null) // results[] | null
+  useEffect(() => {
+    const q = globalQ.trim()
+    if (!q) {
+      setGlobalResults(null)
+      return undefined
+    }
+    const t = setTimeout(() => {
+      api
+        .searchAll(q)
+        .then((r) => setGlobalResults(r.results))
+        .catch(() => setGlobalResults(null))
+    }, 300)
+    return () => clearTimeout(t)
+  }, [globalQ])
+  const jumpToGlobal = useCallback(
+    async (traceId, m) => {
+      await selectTrace(traceId)
+      setActiveBranchId(m.branch_id)
+      setSelectedId(m.dp_id)
+    },
+    [selectTrace]
+  )
+
   // ---- 决策点内容搜索(spec trace-search):防抖查询 → 结果浮层 → 点击定位 ----
   const [searchQ, setSearchQ] = useState('')
   const [searchHits, setSearchHits] = useState(null) // matches[] | null
@@ -400,6 +426,58 @@ export default function App() {
           ))}
         </div>
 
+        <input
+          className="global-search"
+          placeholder="全局搜索决策点内容…"
+          value={globalQ}
+          onChange={(e) => setGlobalQ(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') setGlobalQ('')
+          }}
+        />
+        {globalQ.trim() && globalResults && globalResults.length === 0 && (
+          <div className="empty-hint">无命中</div>
+        )}
+        {globalQ.trim() && globalResults && globalResults.length > 0 && (
+          <div className="trace-list">
+            {globalResults.map((r) => (
+              <div key={r.trace_id} className="gs-trace">
+                <button
+                  className="gs-trace-head"
+                  title="进入该 trace"
+                  onClick={() => {
+                    setGlobalQ('')
+                    selectTrace(r.trace_id)
+                  }}
+                >
+                  <span className="trace-name">{r.trace_name || r.trace_id}</span>
+                  <span className="gs-count">
+                    {r.match_count} 命中 · {fmtTime(r.started_at)}
+                  </span>
+                </button>
+                {r.matches.slice(0, 5).map((m, i) => (
+                  <button
+                    key={`${m.branch_id}-${m.step_index}-${m.matched_in}-${i}`}
+                    className="search-hit"
+                    onClick={() => jumpToGlobal(r.trace_id, m)}
+                  >
+                    <span className={`search-kind kind-${m.kind}`}>
+                      {m.kind === 'tool' ? '工具' : 'LLM'} #{m.step_index}
+                    </span>
+                    <span className={`search-where where-${m.matched_in}`}>
+                      {m.matched_in === 'input' ? '输入' : '输出'}
+                    </span>
+                    <Snippet text={m.snippet} q={globalQ.trim()} />
+                  </button>
+                ))}
+                {r.match_count > r.matches.length && (
+                  <div className="gs-more">…共 {r.match_count} 条命中(点击上方进入查看)</div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+        {!globalQ.trim() && (
         <div className="trace-list">
           {traces.length === 0 && <div className="empty-hint">暂无 trace</div>}
           {traces.map((t) => (
@@ -431,6 +509,7 @@ export default function App() {
             </div>
           ))}
         </div>
+        )}
 
         <div className="side-actions">
           <button className="ghost-btn" onClick={() => fileInputRef.current?.click()}>

@@ -1142,6 +1142,61 @@ body {
   font-style: italic;
 }
 
+/* ---- 跨 trace 全局搜索 ---- */
+.global-search {
+  width: 100%;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 6px 8px;
+  margin-bottom: 8px;
+}
+.global-search:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.gs-trace {
+  margin-bottom: 6px;
+}
+.gs-trace-head {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 8px;
+  color: var(--text);
+  cursor: pointer;
+  font-family: var(--mono);
+  margin-bottom: 4px;
+}
+.gs-trace-head:hover {
+  border-color: var(--accent);
+}
+.gs-trace-head .trace-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gs-count {
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.gs-more {
+  color: var(--muted);
+  font-size: 11px;
+  text-align: center;
+  padding: 2px 0 4px;
+}
+
 /* ---- 决策点搜索(spec trace-search)---- */
 .search-pick input {
   width: 180px;

@@ -11,10 +11,10 @@
 
 ## 3. UI
 
-- [ ] 3.1 侧栏全局搜索框(防抖)+ 分组命中视图(trace 头 / 命中直达 / 清空恢复);样式
-- [ ] 3.2 浏览器实测:分组结果、直达定位、清空恢复
+- [x] 3.1 侧栏全局搜索框(防抖)+ 分组命中视图(trace 头 / 命中直达 / 清空恢复);样式
+- [x] 3.2 浏览器实测:分组结果、直达定位、清空恢复
 
 ## 4. 验证与发布
 
-- [ ] 4.1 全量 pytest 零回归;`npm run build` 通过;`openspec validate --all` 通过
-- [ ] 4.2 README 补全局搜索;`openspec/archive global-search`;commit + push
+- [x] 4.1 全量 pytest 零回归;`npm run build` 通过;`openspec validate --all` 通过
+- [x] 4.2 README 补全局搜索;`openspec/archive global-search`;commit + push

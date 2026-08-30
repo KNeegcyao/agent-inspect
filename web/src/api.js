@@ -60,6 +60,9 @@ export const api = {
       body: JSON.stringify(payload),
     }).then(parse)
   },
+  searchAll(q) {
+    return fetch(`/api/search?q=${encodeURIComponent(q)}`).then(parse)
+  },
   searchTrace(traceId, q) {
     return fetch(
       `/api/traces/${encodeURIComponent(traceId)}/search?q=${encodeURIComponent(q)}`
