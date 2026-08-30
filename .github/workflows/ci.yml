@@ -72,7 +72,7 @@ jobs:
           python -m build --wheel
       - name: Sanity-check wheel contents
         run: |
-          python -c "import zipfile, glob; names = zipfile.ZipFile(glob.glob('dist/*.whl')[0]).namelist(); assert 'agent_inspect/panel/index.html' in names, 'wheel must bundle panel'; print('wheel carries panel: OK")
+          python -c "import zipfile, glob; names = zipfile.ZipFile(glob.glob('dist/*.whl')[0]).namelist(); assert 'agent_inspect/panel/index.html' in names, 'wheel must bundle panel'; print('wheel carries panel: OK')"
       - name: npm pack sanity (node sdk bundles panel)
         working-directory: sdks/node
         run: npm pack --dry-run
