@@ -14,4 +14,4 @@
 
 - [x] 3.1 `/api/forks` 透传 sandbox;e2e(meta 标记 + 无真调 + 非法 422)
 - [x] 3.2 全量 node:test 零回归;Python pytest 零回归;`npm run build` 通过
-- [ ] 3.3 `openspec validate --all` 通过;`openspec archive node-side-effect-sandbox`;commit + push
+- [x] 3.3 `openspec validate --all` 通过;`openspec archive node-side-effect-sandbox`;commit + push
